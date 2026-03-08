@@ -9,10 +9,6 @@
   gap: 20px;
   align-items: start;
 }
-@media (max-width: 900px) {
-  .edit-page { grid-template-columns: 1fr; }
-  .edit-sidebar { display: none; }
-}
 
 /* ── Sidebar de listagem ── */
 .edit-sidebar {
@@ -149,9 +145,6 @@
 .fg.c2 { grid-template-columns: 1fr 1fr; }
 .fg.c3 { grid-template-columns: 1fr 1fr 1fr; }
 .fg.c2 .span2 { grid-column: 1 / -1; }
-@media (max-width: 700px) {
-  .fg.c2, .fg.c3 { grid-template-columns: 1fr; }
-}
 
 .fl { display: flex; flex-direction: column; gap: 6px; }
 .fl label {
@@ -350,3 +343,152 @@
 }
 .confirm-bar.visible { display: flex; }
 .confirm-bar p { flex: 1; color: #e08080; }
+
+/* =============================================================================
+   RESPONSIVO
+   ============================================================================= */
+
+/* ── Tablet: até 1024px ── */
+@media (max-width: 1024px) {
+  .edit-page {
+    grid-template-columns: 240px 1fr;
+    gap: 16px;
+  }
+
+  .fg.c3 { grid-template-columns: 1fr 1fr; }
+
+  .perm-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+
+  .form-card-body { padding: 16px 14px; }
+}
+
+/* ── Tablet médio: até 900px — sidebar vira drawer ── */
+@media (max-width: 900px) {
+  /* Layout vira coluna única */
+  .edit-page {
+    grid-template-columns: 1fr;
+    position: relative;
+  }
+
+  /* Sidebar some do fluxo e vira drawer lateral */
+  .edit-sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 280px;
+    z-index: 60;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    padding: 16px 12px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    /* sticky não se aplica em fixed */
+    top: 0;
+  }
+  .edit-sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+
+  /* Backdrop para fechar drawer */
+  .edit-sidebar-backdrop {
+    display: none;
+    position: fixed; inset: 0; z-index: 55;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(2px);
+  }
+  .edit-sidebar-backdrop.open { display: block; }
+
+  /* Botão para abrir a sidebar no mobile */
+  .edit-sidebar-toggle {
+    display: inline-flex;
+    align-items: center; gap: 7px;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--panel);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: var(--trans);
+  }
+  .edit-sidebar-toggle:hover {
+    border-color: var(--blue);
+    color: var(--blue2);
+    background: var(--blue-dim);
+  }
+
+  /* Sidebar list ocupa altura disponível dentro do drawer */
+  .sidebar-list {
+    max-height: calc(100vh - 120px);
+  }
+
+  .edit-topbar { flex-wrap: wrap; }
+  .edit-actions { flex-wrap: wrap; }
+}
+
+/* ── Mobile: até 640px ── */
+@media (max-width: 640px) {
+  /* Grids de campos: sempre 1 coluna */
+  .fg.c2,
+  .fg.c3 { grid-template-columns: 1fr; }
+  .fg.c2 .span2 { grid-column: 1; }
+
+  .form-card-body { padding: 14px 12px; }
+  .form-card-header { padding: 10px 12px; }
+
+  /* Topbar empilha */
+  .edit-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .edit-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  /* Danger row empilha */
+  .danger-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* Avatar: ícone menor */
+  .avatar-circle {
+    width: 44px; height: 44px;
+    font-size: 18px;
+  }
+
+  /* Permissões: 1 coluna */
+  .perm-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Confirm bar empilha */
+  .confirm-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .confirm-bar p { width: 100%; }
+
+  /* Edit empty menor */
+  .edit-empty { min-height: 200px; }
+  .edit-empty-icon { font-size: 28px; }
+}
+
+/* ── Mobile pequeno: até 400px ── */
+@media (max-width: 400px) {
+  .perm-grid { grid-template-columns: 1fr; }
+
+  .fl input,
+  .fl select,
+  .fl textarea { font-size: 12px; padding: 8px 10px; }
+
+  .edit-actions { gap: 6px; }
+
+  .danger-info h4 { font-size: 12px; }
+  .danger-info p  { font-size: 10px; }
+}
