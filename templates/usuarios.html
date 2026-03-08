@@ -1,0 +1,397 @@
+{% extends "base_corp.html" %}
+{% block title %}Usuários — Wayne Industries{% endblock %}
+{% block nav_usuarios %}active{% endblock %}
+{% block page_title %}Usuários{% endblock %}
+{% block page_breadcrumb %}Wayne Industries / Gestão de Usuários{% endblock %}
+
+{% block content %}
+
+<!-- CARDS DE RESUMO -->
+<div class="summary-cards">
+  <div class="s-card blue">
+    <div class="sc-label">Total Ativos</div>
+    <div class="sc-value blue" id="u-total">—</div>
+    <div class="sc-sub">usuários no sistema</div>
+  </div>
+  <div class="s-card purple" style="--accent:#cc88ff">
+    <div class="sc-label">Admins</div>
+    <div class="sc-value" style="color:#cc88ff" id="u-admin">—</div>
+    <div class="sc-sub">acesso total</div>
+  </div>
+  <div class="s-card cyan">
+    <div class="sc-label">Gerentes</div>
+    <div class="sc-value cyan" id="u-gerente">—</div>
+    <div class="sc-sub">aprovam acessos</div>
+  </div>
+  <div class="s-card green">
+    <div class="sc-label">Funcionários</div>
+    <div class="sc-value green" id="u-func">—</div>
+    <div class="sc-sub">acesso padrão</div>
+  </div>
+</div>
+
+<!-- PAINEL DE USUÁRIOS -->
+<div class="corp-panel">
+  <div class="panel-header">
+    <div class="panel-title-wrap">
+      <span class="panel-title">DIRETÓRIO DE USUÁRIOS</span>
+      <span class="panel-count" id="user-count">0</span>
+    </div>
+    <div class="panel-actions">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input class="search-input" id="user-search" placeholder="Buscar usuário..." oninput="filtrarUsuarios()">
+      </div>
+      <select class="filter-select" id="user-filter-nivel" onchange="filtrarUsuarios()">
+        <option value="">Todos os níveis</option>
+        <option value="admin">Admin</option>
+        <option value="gerente">Gerente</option>
+        <option value="funcionario">Funcionário</option>
+        <option value="operador">Operador</option>
+      </select>
+      <select class="filter-select" id="user-filter-ativo" onchange="filtrarUsuarios()">
+        <option value="">Todos</option>
+        <option value="1">Ativos</option>
+        <option value="0">Inativos</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="abrirFormUsuario()">+ Novo Usuário</button>
+    </div>
+  </div>
+
+  <div class="corp-table-wrap">
+    <table class="corp-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nome</th>
+          <th>Nível</th>
+          <th>Departamento</th>
+          <th>Status</th>
+          <th>Criado em</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="user-tbody">
+        <tr><td colspan="7"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- LOG DE ACESSOS AO SISTEMA -->
+<div class="corp-panel">
+  <div class="panel-header">
+    <div class="panel-title-wrap">
+      <span class="panel-title">LOG DE ACESSOS AO SISTEMA</span>
+    </div>
+    <div class="panel-actions">
+      <button class="btn btn-ghost btn-sm" onclick="carregarLogs()">↻ Atualizar</button>
+    </div>
+  </div>
+  <div class="corp-table-wrap">
+    <table class="corp-table">
+      <thead>
+        <tr>
+          <th>Usuário</th>
+          <th>IP</th>
+          <th>Resultado</th>
+          <th>Mensagem</th>
+          <th>Data / Hora</th>
+        </tr>
+      </thead>
+      <tbody id="log-sistema-tbody">
+        <tr><td colspan="5"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<!-- MODAL FORM USUÁRIO -->
+<div class="modal-overlay" id="modal-usuario" style="display:none">
+  <div class="modal-box wide" style="position:relative">
+    <button class="modal-close" onclick="fecharModal('modal-usuario')">✕</button>
+    <div class="modal-title" id="modal-user-title">Novo Usuário</div>
+    <div style="margin-top:18px">
+      <div class="form-grid cols-2">
+        <div class="form-group">
+          <label class="form-label">ID do Usuário *</label>
+          <input class="form-input" id="user-f-id" placeholder="Ex: WI-00456">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nome Completo *</label>
+          <input class="form-input" id="user-f-nome" placeholder="Nome do usuário">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha *</label>
+          <input class="form-input" id="user-f-senha" type="password" placeholder="Senha de acesso">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar Senha *</label>
+          <input class="form-input" id="user-f-senha2" type="password" placeholder="Repita a senha">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nível de Acesso *</label>
+          <select class="form-select" id="user-f-nivel">
+            <option value="operador">Operador</option>
+            <option value="funcionario">Funcionário</option>
+            <option value="gerente">Gerente</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Departamento *</label>
+          <input class="form-input" id="user-f-dept" placeholder="Ex: Segurança, TI, P&D">
+        </div>
+      </div>
+
+      <!-- ALERTA EDIÇÃO -->
+      <div id="user-edit-note" style="display:none;margin-top:12px;padding:10px 14px;background:var(--blue-dim);border:1px solid #1d6ef533;border-radius:var(--radius);font-size:11px;color:var(--blue2)">
+        ℹ Deixe o campo de senha em branco para manter a senha atual.
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+        <button class="btn btn-primary" onclick="salvarUsuario()">Salvar</button>
+        <button class="btn btn-ghost" onclick="fecharModal('modal-usuario')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR STATUS -->
+<div class="modal-overlay" id="modal-user-status" style="display:none">
+  <div class="modal-box" style="position:relative">
+    <button class="modal-close" onclick="fecharModal('modal-user-status')">✕</button>
+    <div class="modal-title" id="status-modal-title">Alterar Nível</div>
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Novo Nível</label>
+        <select class="form-select" id="status-f-nivel">
+          <option value="operador">Operador</option>
+          <option value="funcionario">Funcionário</option>
+          <option value="gerente">Gerente</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Departamento</label>
+        <input class="form-input" id="status-f-dept">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <button class="btn btn-primary" id="status-save-btn">Salvar</button>
+      <button class="btn btn-ghost" onclick="fecharModal('modal-user-status')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let todosUsuarios = [];
+let editandoUserId = null;
+
+const NIVEL_BADGE = {
+  admin:       'badge-purple',
+  gerente:     'badge-blue',
+  funcionario: 'badge-green',
+  operador:    'badge-muted',
+};
+
+async function carregarUsuarios() {
+  try {
+    todosUsuarios = await api('/api/usuarios');
+    renderizarUsuarios(todosUsuarios);
+    atualizarCards(todosUsuarios);
+  } catch(e) {
+    toast('error', 'Erro ao carregar usuários: ' + e.message);
+  }
+}
+
+function atualizarCards(usuarios) {
+  const ativos = usuarios.filter(u => u.ativo);
+  document.getElementById('u-total').textContent   = ativos.length;
+  document.getElementById('u-admin').textContent   = ativos.filter(u => u.nivel === 'admin').length;
+  document.getElementById('u-gerente').textContent = ativos.filter(u => u.nivel === 'gerente').length;
+  document.getElementById('u-func').textContent    = ativos.filter(u => u.nivel === 'funcionario').length;
+}
+
+function renderizarUsuarios(usuarios) {
+  const tbody = document.getElementById('user-tbody');
+  document.getElementById('user-count').textContent = usuarios.length;
+
+  if (!usuarios.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
+      <div class="empty-state-icon">◎</div><span>Nenhum usuário encontrado</span></div></td></tr>`;
+    return;
+  }
+
+  const meuId = window._sessao?.usuario_id;
+
+  tbody.innerHTML = usuarios.map(u => `
+    <tr>
+      <td class="mono">${u.usuario_id}</td>
+      <td class="bold">${u.nome || '—'}</td>
+      <td><span class="badge ${NIVEL_BADGE[u.nivel]||'badge-muted'}">${u.nivel}</span></td>
+      <td class="text-muted">${u.departamento || '—'}</td>
+      <td>
+        ${u.ativo
+          ? '<span class="badge badge-green">Ativo</span>'
+          : '<span class="badge badge-red">Inativo</span>'}
+      </td>
+      <td class="mono text-muted">${u.criado_em?.slice(0,10) || '—'}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn-icon" title="Editar" onclick="editarUsuario('${u.usuario_id}')">✎</button>
+          <button class="btn-icon" title="Alterar nível/dept" onclick="abrirAlterarStatus('${u.usuario_id}','${u.nivel}','${u.departamento||''}')">◈</button>
+          ${u.usuario_id !== meuId
+            ? `<button class="btn-icon ${u.ativo ? 'danger' : ''}" title="${u.ativo ? 'Desativar' : 'Reativar'}"
+                 onclick="${u.ativo ? `desativarUsuario('${u.usuario_id}','${u.nome}')` : `reativarUsuario('${u.usuario_id}')`}">
+                 ${u.ativo ? '✕' : '↺'}
+               </button>`
+            : '<span style="width:28px;display:inline-block"></span>'}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function filtrarUsuarios() {
+  const q     = document.getElementById('user-search').value.toLowerCase();
+  const nivel = document.getElementById('user-filter-nivel').value;
+  const ativo = document.getElementById('user-filter-ativo').value;
+
+  const filtrados = todosUsuarios.filter(u => {
+    const matchQ     = !q     || u.nome?.toLowerCase().includes(q) || u.usuario_id.toLowerCase().includes(q) || (u.departamento||'').toLowerCase().includes(q);
+    const matchNivel = !nivel || u.nivel === nivel;
+    const matchAtivo = ativo === '' || String(u.ativo) === ativo;
+    return matchQ && matchNivel && matchAtivo;
+  });
+  renderizarUsuarios(filtrados);
+}
+
+function abrirFormUsuario(usuario = null) {
+  editandoUserId = usuario ? usuario.usuario_id : null;
+  document.getElementById('modal-user-title').textContent = usuario ? 'Editar Usuário' : 'Novo Usuário';
+  document.getElementById('user-f-id').value     = usuario?.usuario_id   || '';
+  document.getElementById('user-f-nome').value   = usuario?.nome         || '';
+  document.getElementById('user-f-senha').value  = '';
+  document.getElementById('user-f-senha2').value = '';
+  document.getElementById('user-f-nivel').value  = usuario?.nivel        || 'operador';
+  document.getElementById('user-f-dept').value   = usuario?.departamento || '';
+  document.getElementById('user-f-id').disabled  = !!usuario;
+  document.getElementById('user-edit-note').style.display = usuario ? 'block' : 'none';
+  const senhaEl = document.getElementById('user-f-senha');
+  senhaEl.required = !usuario;
+  senhaEl.placeholder = usuario ? 'Deixe em branco para manter' : 'Senha de acesso';
+  abrirModal('modal-usuario');
+}
+
+function editarUsuario(id) {
+  const u = todosUsuarios.find(u => u.usuario_id === id);
+  if (u) abrirFormUsuario(u);
+}
+
+async function salvarUsuario() {
+  const id    = document.getElementById('user-f-id').value.trim();
+  const nome  = document.getElementById('user-f-nome').value.trim();
+  const senha = document.getElementById('user-f-senha').value;
+  const senha2= document.getElementById('user-f-senha2').value;
+  const nivel = document.getElementById('user-f-nivel').value;
+  const dept  = document.getElementById('user-f-dept').value.trim();
+
+  if (!nome || !nivel || !dept) { toast('warning', 'Preencha todos os campos obrigatórios.'); return; }
+  if (!editandoUserId && !id)   { toast('warning', 'ID do usuário é obrigatório.'); return; }
+  if (!editandoUserId && !senha){ toast('warning', 'Senha é obrigatória para novo usuário.'); return; }
+  if (senha && senha !== senha2) { toast('warning', 'As senhas não coincidem.'); return; }
+
+  const payload = { nome, nivel, departamento: dept };
+  if (senha) payload.senha = senha;
+  if (!editandoUserId) { payload.usuario_id = id; }
+
+  try {
+    if (editandoUserId) {
+      await api(`/api/usuarios/${editandoUserId}`, { method:'PUT', body: JSON.stringify(payload) });
+      toast('success', 'Usuário atualizado.');
+    } else {
+      await api('/api/usuarios', { method:'POST', body: JSON.stringify(payload) });
+      toast('success', 'Usuário criado.');
+    }
+    fecharModal('modal-usuario');
+    carregarUsuarios();
+  } catch(e) {
+    toast('error', e.message);
+  }
+}
+
+function abrirAlterarStatus(id, nivelAtual, deptAtual) {
+  document.getElementById('status-modal-title').textContent = `Alterar: ${id}`;
+  document.getElementById('status-f-nivel').value = nivelAtual;
+  document.getElementById('status-f-dept').value  = deptAtual;
+  const btn = document.getElementById('status-save-btn');
+  btn.onclick = async () => {
+    try {
+      await api(`/api/usuarios/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          nivel:       document.getElementById('status-f-nivel').value,
+          departamento:document.getElementById('status-f-dept').value.trim(),
+        })
+      });
+      toast('success', 'Usuário atualizado.');
+      fecharModal('modal-user-status');
+      carregarUsuarios();
+    } catch(e) {
+      toast('error', e.message);
+    }
+  };
+  abrirModal('modal-user-status');
+}
+
+function desativarUsuario(id, nome) {
+  confirmar('Desativar Usuário', `Tem certeza que deseja desativar "${nome}"? O usuário perderá o acesso ao sistema.`, async () => {
+    try {
+      await api(`/api/usuarios/${id}`, { method: 'DELETE' });
+      toast('success', 'Usuário desativado.');
+      carregarUsuarios();
+    } catch(e) {
+      toast('error', e.message);
+    }
+  });
+}
+
+async function reativarUsuario(id) {
+  try {
+    await api(`/api/usuarios/${id}`, { method:'PUT', body: JSON.stringify({ ativo: 1 }) });
+    toast('success', 'Usuário reativado.');
+    carregarUsuarios();
+  } catch(e) {
+    toast('error', e.message);
+  }
+}
+
+async function carregarLogs() {
+  try {
+    const rows  = await api('/api/logs/acesso?limit=30');
+    const tbody = document.getElementById('log-sistema-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><span>Sem registros</span></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td class="mono">${r.usuario_id || '—'}</td>
+        <td class="mono text-muted">${r.ip || '—'}</td>
+        <td><span class="badge ${r.sucesso ? 'badge-green' : 'badge-red'}">${r.sucesso ? 'Sucesso' : 'Falha'}</span></td>
+        <td class="text-muted">${r.mensagem || '—'}</td>
+        <td class="mono text-muted">${r.criado_em?.slice(0,16).replace('T',' ') || '—'}</td>
+      </tr>`).join('');
+  } catch(e) {
+    toast('error', 'Erro ao carregar logs: ' + e.message);
+  }
+}
+
+carregarUsuarios();
+carregarLogs();
+</script>
+{% endblock %}

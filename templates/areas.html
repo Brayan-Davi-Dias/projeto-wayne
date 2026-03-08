@@ -1,0 +1,374 @@
+{% extends "base_corp.html" %}
+{% block title %}Áreas — Wayne Industries{% endblock %}
+{% block nav_areas %}active{% endblock %}
+{% block page_title %}Áreas Restritas{% endblock %}
+{% block page_breadcrumb %}Wayne Industries / Controle de Acesso{% endblock %}
+
+{% block content %}
+
+<!-- CARDS DE RESUMO -->
+<div class="summary-cards">
+  <div class="s-card blue">
+    <div class="sc-label">Total de Áreas</div>
+    <div class="sc-value blue" id="a-total">—</div>
+    <div class="sc-sub">zonas cadastradas</div>
+  </div>
+  <div class="s-card green">
+    <div class="sc-label">Com Acesso</div>
+    <div class="sc-value green" id="a-acesso">—</div>
+    <div class="sc-sub">liberadas para você</div>
+  </div>
+  <div class="s-card red">
+    <div class="sc-label">Restritas</div>
+    <div class="sc-value red" id="a-restrict">—</div>
+    <div class="sc-sub">acesso negado</div>
+  </div>
+  <div class="s-card gold">
+    <div class="sc-label">Em Alerta</div>
+    <div class="sc-value gold" id="a-alert">—</div>
+    <div class="sc-sub">status crítico/alerta</div>
+  </div>
+</div>
+
+<!-- PAINEL DE ÁREAS -->
+<div class="corp-panel">
+  <div class="panel-header">
+    <div class="panel-title-wrap">
+      <span class="panel-title">MAPA DE ÁREAS</span>
+      <span class="panel-count" id="area-count">0</span>
+    </div>
+    <div class="panel-actions">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input class="search-input" id="area-search" placeholder="Buscar área..." oninput="filtrarAreas()">
+      </div>
+      <select class="filter-select" id="area-filter-nivel" onchange="filtrarAreas()">
+        <option value="">Todos os níveis</option>
+        <option value="operador">Operador</option>
+        <option value="funcionario">Funcionário</option>
+        <option value="gerente">Gerente</option>
+        <option value="admin">Admin</option>
+      </select>
+      <select class="filter-select" id="area-filter-status" onchange="filtrarAreas()">
+        <option value="">Todos os status</option>
+        <option value="normal">Normal</option>
+        <option value="alerta">Alerta</option>
+        <option value="critico">Crítico</option>
+      </select>
+      <button class="btn btn-primary btn-sm" id="btn-nova-area" onclick="abrirFormArea()" style="display:none">+ Nova Área</button>
+    </div>
+  </div>
+
+  <div class="corp-table-wrap">
+    <table class="corp-table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Nome</th>
+          <th>Andar</th>
+          <th>Nível Exigido</th>
+          <th>Status</th>
+          <th>Descrição</th>
+          <th>Acesso</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="area-tbody">
+        <tr><td colspan="8"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- LOG DE ACESSOS -->
+<div class="corp-panel" id="panel-log-areas">
+  <div class="panel-header">
+    <div class="panel-title-wrap">
+      <span class="panel-title">REGISTRO DE ACESSOS FÍSICOS</span>
+    </div>
+    <div class="panel-actions">
+      <select class="filter-select" id="log-filter-area" onchange="carregarLogAreas()">
+        <option value="">Todas as áreas</option>
+      </select>
+    </div>
+  </div>
+  <div class="corp-table-wrap">
+    <table class="corp-table">
+      <thead>
+        <tr>
+          <th>Usuário</th>
+          <th>Área</th>
+          <th>Tipo</th>
+          <th>Motivo</th>
+          <th>Data / Hora</th>
+        </tr>
+      </thead>
+      <tbody id="log-tbody">
+        <tr><td colspan="5"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<!-- MODAL ÁREA -->
+<div class="modal-overlay" id="modal-area" style="display:none">
+  <div class="modal-box wide" style="position:relative">
+    <button class="modal-close" onclick="fecharModal('modal-area')">✕</button>
+    <div class="modal-title" id="modal-area-title">Nova Área</div>
+    <div style="margin-top:18px">
+      <div class="form-grid cols-2">
+        <div class="form-group">
+          <label class="form-label">Código *</label>
+          <input class="form-input" id="area-f-codigo" placeholder="AREA-XX">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nome *</label>
+          <input class="form-input" id="area-f-nome" placeholder="Nome da área">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Andar *</label>
+          <input class="form-input" id="area-f-andar" placeholder="Ex: 1º Andar, Subsolo">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nível de Acesso *</label>
+          <select class="form-select" id="area-f-nivel">
+            <option value="operador">Operador</option>
+            <option value="funcionario">Funcionário</option>
+            <option value="gerente">Gerente</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="area-f-status">
+            <option value="normal">Normal</option>
+            <option value="alerta">Alerta</option>
+            <option value="critico">Crítico</option>
+          </select>
+        </div>
+        <div class="form-group span-2">
+          <label class="form-label">Descrição</label>
+          <textarea class="form-textarea" id="area-f-desc" placeholder="Descrição opcional..."></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+        <button class="btn btn-primary" onclick="salvarArea()">Salvar</button>
+        <button class="btn btn-ghost" onclick="fecharModal('modal-area')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SOLICITAR ACESSO -->
+<div class="modal-overlay" id="modal-acesso" style="display:none">
+  <div class="modal-box" style="position:relative">
+    <button class="modal-close" onclick="fecharModal('modal-acesso')">✕</button>
+    <div class="modal-icon">▦</div>
+    <div class="modal-title" id="acesso-titulo">Solicitar Acesso</div>
+    <div class="modal-body" id="acesso-corpo">—</div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="acesso-btn-confirmar">Confirmar Entrada</button>
+      <button class="btn btn-ghost" onclick="fecharModal('modal-acesso')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let todasAreas = [];
+let editandoAreaCodigo = null;
+
+const NIVEL_BADGE = {
+  operador:    'badge-muted',
+  funcionario: 'badge-green',
+  gerente:     'badge-blue',
+  admin:       'badge-purple',
+};
+const STATUS_BADGE_AREA = {
+  normal:  'badge-green',
+  alerta:  'badge-gold',
+  critico: 'badge-red',
+};
+
+async function carregarAreas() {
+  try {
+    todasAreas = await api('/api/areas');
+    renderizarAreas(todasAreas);
+    atualizarCards(todasAreas);
+    popularFiltroLog(todasAreas);
+  } catch(e) {
+    toast('error', 'Erro ao carregar áreas: ' + e.message);
+  }
+}
+
+function atualizarCards(areas) {
+  document.getElementById('a-total').textContent    = areas.length;
+  document.getElementById('a-acesso').textContent   = areas.filter(a => a.tem_acesso).length;
+  document.getElementById('a-restrict').textContent = areas.filter(a => !a.tem_acesso).length;
+  document.getElementById('a-alert').textContent    = areas.filter(a => a.status !== 'normal').length;
+}
+
+function popularFiltroLog(areas) {
+  const sel = document.getElementById('log-filter-area');
+  sel.innerHTML = '<option value="">Todas as áreas</option>' +
+    areas.map(a => `<option value="${a.codigo}">${a.codigo} — ${a.nome}</option>`).join('');
+}
+
+function renderizarAreas(areas) {
+  const tbody = document.getElementById('area-tbody');
+  document.getElementById('area-count').textContent = areas.length;
+
+  if (!areas.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">
+      <div class="empty-state-icon">▦</div><span>Nenhuma área encontrada</span></div></td></tr>`;
+    return;
+  }
+
+  const podeEditar = ['gerente','admin'].includes(window._sessao?.nivel);
+
+  tbody.innerHTML = areas.map(a => `
+    <tr>
+      <td class="mono">${a.codigo}</td>
+      <td class="bold">${a.nome}</td>
+      <td class="text-muted">${a.andar || '—'}</td>
+      <td><span class="badge ${NIVEL_BADGE[a.nivel_acesso]||'badge-muted'}">${a.nivel_acesso}</span></td>
+      <td><span class="badge ${STATUS_BADGE_AREA[a.status]||'badge-muted'}">${a.status}</span></td>
+      <td class="text-muted" style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.descricao || '—'}</td>
+      <td>
+        ${a.tem_acesso
+          ? '<span class="badge badge-green">✓ Autorizado</span>'
+          : '<span class="badge badge-red">✕ Restrito</span>'}
+      </td>
+      <td>
+        <div class="row-actions">
+          ${a.tem_acesso
+            ? `<button class="btn-icon" title="Solicitar entrada" onclick="solicitarAcesso('${a.codigo}','${a.nome}')">→</button>`
+            : ''}
+          ${podeEditar
+            ? `<button class="btn-icon" title="Editar" onclick="editarArea('${a.codigo}')">✎</button>`
+            : ''}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function filtrarAreas() {
+  const q      = document.getElementById('area-search').value.toLowerCase();
+  const nivel  = document.getElementById('area-filter-nivel').value;
+  const status = document.getElementById('area-filter-status').value;
+
+  const filtradas = todasAreas.filter(a => {
+    const matchQ      = !q || a.nome.toLowerCase().includes(q) || a.codigo.toLowerCase().includes(q) || (a.andar||'').toLowerCase().includes(q);
+    const matchNivel  = !nivel  || a.nivel_acesso === nivel;
+    const matchStatus = !status || a.status === status;
+    return matchQ && matchNivel && matchStatus;
+  });
+  renderizarAreas(filtradas);
+}
+
+function solicitarAcesso(codigo, nome) {
+  document.getElementById('acesso-titulo').textContent = `Entrar em: ${nome}`;
+  document.getElementById('acesso-corpo').textContent  = `Confirmar solicitação de acesso físico à área ${codigo}? O evento será registrado no log.`;
+  const btn = document.getElementById('acesso-btn-confirmar');
+  btn.onclick = async () => {
+    try {
+      const res = await api(`/api/areas/${codigo}/acessar`, { method: 'POST' });
+      fecharModal('modal-acesso');
+      toast('success', res.mensagem);
+      carregarLogAreas();
+    } catch(e) {
+      fecharModal('modal-acesso');
+      toast('error', e.message);
+    }
+  };
+  abrirModal('modal-acesso');
+}
+
+function abrirFormArea(area = null) {
+  editandoAreaCodigo = area ? area.codigo : null;
+  document.getElementById('modal-area-title').textContent = area ? 'Editar Área' : 'Nova Área';
+  document.getElementById('area-f-codigo').value  = area?.codigo       || '';
+  document.getElementById('area-f-nome').value    = area?.nome         || '';
+  document.getElementById('area-f-andar').value   = area?.andar        || '';
+  document.getElementById('area-f-nivel').value   = area?.nivel_acesso || 'funcionario';
+  document.getElementById('area-f-status').value  = area?.status       || 'normal';
+  document.getElementById('area-f-desc').value    = area?.descricao    || '';
+  document.getElementById('area-f-codigo').disabled = !!area;
+  abrirModal('modal-area');
+}
+
+function editarArea(codigo) {
+  const area = todasAreas.find(a => a.codigo === codigo);
+  if (area) abrirFormArea(area);
+}
+
+async function salvarArea() {
+  const payload = {
+    codigo:       document.getElementById('area-f-codigo').value.trim(),
+    nome:         document.getElementById('area-f-nome').value.trim(),
+    andar:        document.getElementById('area-f-andar').value.trim(),
+    nivel_acesso: document.getElementById('area-f-nivel').value,
+    status:       document.getElementById('area-f-status').value,
+    descricao:    document.getElementById('area-f-desc').value.trim(),
+  };
+
+  if (!payload.codigo || !payload.nome || !payload.andar) {
+    toast('warning', 'Código, nome e andar são obrigatórios.'); return;
+  }
+
+  try {
+    if (editandoAreaCodigo) {
+      await api(`/api/areas/${editandoAreaCodigo}`, { method:'PUT', body: JSON.stringify(payload) });
+      toast('success', 'Área atualizada.');
+    } else {
+      await api('/api/areas', { method:'POST', body: JSON.stringify(payload) });
+      toast('success', 'Área criada.');
+    }
+    fecharModal('modal-area');
+    carregarAreas();
+  } catch(e) {
+    toast('error', e.message);
+  }
+}
+
+async function carregarLogAreas() {
+  const area = document.getElementById('log-filter-area').value;
+  try {
+    const url  = area ? `/api/logs/areas?area=${area}&limit=30` : '/api/logs/areas?limit=30';
+    const rows = await api(url);
+    const tbody = document.getElementById('log-tbody');
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><span>Sem registros</span></div></td></tr>`;
+      return;
+    }
+
+    const tipoBadge = { entrada:'badge-green', saida:'badge-blue', negado:'badge-red' };
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td class="mono">${r.usuario_id || '—'}</td>
+        <td class="mono">${r.area_codigo || '—'}</td>
+        <td><span class="badge ${tipoBadge[r.tipo]||'badge-muted'}">${r.tipo}</span></td>
+        <td class="text-muted">${r.motivo || '—'}</td>
+        <td class="mono text-muted">${r.criado_em?.slice(0,16).replace('T',' ') || '—'}</td>
+      </tr>`).join('');
+  } catch(e) {
+    // Log não disponível para este nível — esconde o painel
+    document.getElementById('panel-log-areas').style.display = 'none';
+  }
+}
+
+// Mostra botão de nova área apenas para admin
+setTimeout(() => {
+  if (window._sessao?.nivel === 'admin') {
+    document.getElementById('btn-nova-area').style.display = 'inline-flex';
+  }
+}, 800);
+
+carregarAreas();
+carregarLogAreas();
+</script>
+{% endblock %}

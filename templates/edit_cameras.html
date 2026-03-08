@@ -1,0 +1,328 @@
+{% extends "base_corp.html" %}
+{% block title %}Câmeras — Wayne Industries{% endblock %}
+{% block nav_cameras %}active{% endblock %}
+{% block page_title %}Gestão de Câmeras{% endblock %}
+{% block page_breadcrumb %}Wayne Industries / Câmeras{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edit.css') }}">
+<style>
+.cam-preview {
+  width: 100%; aspect-ratio: 16/9;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--border);
+}
+.cam-preview img { width:100%; height:100%; object-fit:cover; display:block; }
+.cam-preview .no-feed {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  color:var(--muted); gap:8px;
+  font-family:var(--font-mono); font-size:11px;
+}
+.cam-preview .rec-badge {
+  position:absolute; top:10px; right:10px;
+  background:rgba(240,64,64,0.85); color:#fff;
+  font-family:var(--font-mono); font-size:10px; font-weight:700;
+  padding:2px 8px; border-radius:3px;
+  animation: blink 1.2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.cam-preview .status-overlay {
+  position:absolute; bottom:10px; left:10px;
+  background:rgba(0,0,0,0.7); padding:3px 8px;
+  border-radius:3px; font-family:var(--font-mono); font-size:10px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="edit-page">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="edit-sidebar">
+    <div class="sidebar-search">
+      <span class="s-icon">⌕</span>
+      <input id="sb-search" placeholder="Buscar câmera..." oninput="filtrarSidebar()">
+    </div>
+    <div style="margin-bottom:4px">
+      <select class="filter-select" id="sb-filtro-status" onchange="filtrarSidebar()" style="width:100%">
+        <option value="">Todos os status</option>
+        <option value="online">Online</option>
+        <option value="offline">Offline</option>
+        <option value="manutencao">Manutenção</option>
+      </select>
+    </div>
+    <div class="corp-panel" style="overflow:hidden">
+      <div class="panel-header" style="padding:10px 14px">
+        <span class="panel-title">CÂMERAS</span>
+        <span class="panel-count" id="sb-count">0</span>
+      </div>
+      <div class="sidebar-list" id="sb-list">
+        <div class="sidebar-empty">Carregando...</div>
+      </div>
+      <div class="sidebar-footer">
+        <button class="btn btn-primary" style="width:100%" onclick="abrirNovo()">+ Nova Câmera</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="edit-main" id="edit-main">
+    <div class="edit-empty">
+      <div class="edit-empty-icon">◉</div>
+      <p>Selecione uma câmera ou cadastre uma nova</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _cameras = [];
+let _cameraAtual = null;
+
+const statusCam  = { online:'green', offline:'red', manutencao:'gold' };
+const nivelCorCam = { operador:'blue', funcionario:'green', gerente:'gold', admin:'red' };
+
+async function carregarCameras() {
+  try {
+    _cameras = await api('/api/cameras');
+    renderSidebar(_cameras);
+  } catch(e) { toast('error','Erro ao carregar câmeras: '+e.message); }
+}
+
+function renderSidebar(list) {
+  const el = document.getElementById('sb-list');
+  document.getElementById('sb-count').textContent = list.length;
+  if (!list.length) { el.innerHTML = '<div class="sidebar-empty">Nenhuma câmera</div>'; return; }
+  el.innerHTML = list.map(c => `
+    <div class="sidebar-item ${_cameraAtual===c.codigo?'active':''}" onclick="selecionarCamera('${c.codigo}')">
+      <div class="si-dot ${statusCam[c.status]||'muted'}"></div>
+      <div class="si-info">
+        <div class="si-name">${c.nome}</div>
+        <div class="si-sub">${c.codigo} · ${c.localizacao||'—'}</div>
+      </div>
+      <span class="si-badge" style="color:var(--${statusCam[c.status]||'muted'});background:var(--${statusCam[c.status]||'muted'})22;border:1px solid var(--${statusCam[c.status]||'muted'})44">
+        ${c.status?.toUpperCase()||'—'}
+      </span>
+    </div>`).join('');
+}
+
+function filtrarSidebar() {
+  const q = document.getElementById('sb-search').value.toLowerCase();
+  const s = document.getElementById('sb-filtro-status').value;
+  renderSidebar(_cameras.filter(c =>
+    (!q || c.nome.toLowerCase().includes(q) || c.codigo.toLowerCase().includes(q) || (c.localizacao||'').toLowerCase().includes(q)) &&
+    (!s || c.status === s)
+  ));
+}
+
+async function selecionarCamera(codigo) {
+  _cameraAtual = codigo;
+  filtrarSidebar();
+  try {
+    const c = await api(`/api/cameras/${codigo}`);
+    renderFormulario(c);
+  } catch(e) { toast('error', e.message); }
+}
+
+function renderFormulario(c) {
+  const main = document.getElementById('edit-main');
+  const statusLabel = { online:'Online', offline:'Offline', manutencao:'Manutenção' };
+
+  main.innerHTML = `
+    <div class="edit-topbar">
+      <div class="edit-breadcrumb">Câmeras / <span>${c.nome}</span></div>
+      <div class="edit-actions">
+        <button class="btn btn-ghost btn-sm" onclick="carregarCameras()">↺ Atualizar</button>
+        <button class="btn btn-primary btn-sm" onclick="salvarCamera()">✓ Salvar</button>
+      </div>
+    </div>
+
+    <!-- Preview do feed -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <span class="form-card-title">Feed ao Vivo</span>
+        <span class="badge badge-${statusCam[c.status]||'muted'}">${statusLabel[c.status]||c.status}</span>
+      </div>
+      <div class="form-card-body" style="padding:12px">
+        <div class="cam-preview">
+          ${c.feed_url
+            ? `<img src="${c.feed_url}" alt="${c.nome}" onerror="this.parentElement.innerHTML='<div class=no-feed><span style=font-size:24px>◉</span><span>Feed indisponível</span></div>'">
+               ${c.status==='online'?'<div class="rec-badge">● REC</div>':''}
+               <div class="status-overlay" style="color:var(--${statusCam[c.status]||'muted'})">${statusLabel[c.status]||'—'}</div>`
+            : `<div class="no-feed"><span style="font-size:24px">◉</span><span>Sem feed configurado</span></div>`}
+        </div>
+      </div>
+    </div>
+
+    <!-- Dados da câmera -->
+    <div class="form-card">
+      <div class="form-card-header"><span class="form-card-title">Configurações</span></div>
+      <div class="form-card-body">
+        <div class="fg c2">
+          <div class="fl">
+            <label>Código *</label>
+            <input id="c-codigo" value="${c.codigo||''}" disabled>
+            <span class="hint">Identificador único — não pode ser alterado</span>
+          </div>
+          <div class="fl">
+            <label>Nome *</label>
+            <input id="c-nome" value="${c.nome||''}">
+          </div>
+          <div class="fl">
+            <label>Localização *</label>
+            <input id="c-local" value="${c.localizacao||''}">
+          </div>
+          <div class="fl">
+            <label>Área Vinculada</label>
+            <input id="c-area" value="${c.area_codigo||''}" placeholder="Ex: AREA-01">
+          </div>
+          <div class="fl">
+            <label>Nível de Acesso *</label>
+            <select id="c-nivel">
+              ${['operador','funcionario','gerente','admin'].map(n =>
+                `<option value="${n}" ${c.nivel_acesso===n?'selected':''}>${n.charAt(0).toUpperCase()+n.slice(1)}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="fl">
+            <label>URL do Feed</label>
+            <input id="c-feed" value="${c.feed_url||''}" placeholder="https://...">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alterar status -->
+    <div class="form-card">
+      <div class="form-card-header"><span class="form-card-title">Status Operacional</span></div>
+      <div class="form-card-body">
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          ${['online','offline','manutencao'].map(s => `
+            <button class="btn btn-sm ${c.status===s?'btn-primary':'btn-ghost'}"
+              onclick="alterarStatus('${c.codigo}','${s}')"
+              style="${c.status===s?'':'border-color:var(--'+statusCam[s]+');color:var(--'+statusCam[s]+')'}">
+              ● ${statusLabel[s]}
+            </button>`).join('')}
+        </div>
+        <p style="margin-top:10px;font-size:11px;color:var(--muted)">
+          Última atualização: ${c.atualizado_em?.slice(0,16).replace('T',' ')||'—'}
+        </p>
+      </div>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="danger-zone">
+      <div class="form-card-header"><span class="form-card-title">⚠ Zona de Perigo</span></div>
+      <div class="form-card-body">
+        <div class="danger-row">
+          <div class="danger-info">
+            <h4>Excluir Câmera</h4>
+            <p>Remove permanentemente o registro da câmera do sistema.</p>
+          </div>
+          <div>
+            <div class="confirm-bar" id="confirm-del">
+              <p>Confirma exclusão de <strong>${c.nome}</strong>?</p>
+              <button class="btn btn-sm" style="border-color:var(--red);color:var(--red)" onclick="confirmarDelete('${c.codigo}')">Excluir</button>
+              <button class="btn btn-sm btn-ghost" onclick="document.getElementById('confirm-del').classList.remove('visible')">Cancelar</button>
+            </div>
+            <button class="btn btn-sm" style="border-color:var(--red);color:var(--red)"
+              onclick="document.getElementById('confirm-del').classList.add('visible')">✕ Excluir</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function abrirNovo() {
+  _cameraAtual = null;
+  document.getElementById('edit-main').innerHTML = `
+    <div class="edit-topbar">
+      <div class="edit-breadcrumb">Câmeras / <span>Nova</span></div>
+      <div class="edit-actions">
+        <button class="btn btn-primary btn-sm" onclick="criarCamera()">✓ Criar</button>
+      </div>
+    </div>
+    <div class="form-card">
+      <div class="form-card-header"><span class="form-card-title">Nova Câmera</span></div>
+      <div class="form-card-body">
+        <div class="fg c2">
+          <div class="fl"><label>Código *</label><input id="c-codigo" placeholder="CAM-XX"></div>
+          <div class="fl"><label>Nome *</label><input id="c-nome" placeholder="Nome da câmera"></div>
+          <div class="fl"><label>Localização *</label><input id="c-local" placeholder="Ex: Entrada principal"></div>
+          <div class="fl"><label>Área Vinculada</label><input id="c-area" placeholder="Ex: AREA-01"></div>
+          <div class="fl"><label>Nível de Acesso *</label>
+            <select id="c-nivel">
+              <option value="operador">Operador</option><option value="funcionario">Funcionário</option>
+              <option value="gerente">Gerente</option><option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="fl"><label>URL do Feed</label><input id="c-feed" placeholder="https://..."></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function criarCamera() {
+  const payload = {
+    codigo:      document.getElementById('c-codigo')?.value.trim(),
+    nome:        document.getElementById('c-nome')?.value.trim(),
+    localizacao: document.getElementById('c-local')?.value.trim(),
+    area_codigo: document.getElementById('c-area')?.value.trim()||null,
+    nivel_acesso:document.getElementById('c-nivel')?.value,
+    feed_url:    document.getElementById('c-feed')?.value.trim()||null,
+  };
+  if (!payload.codigo||!payload.nome||!payload.localizacao) { toast('warning','Código, nome e localização são obrigatórios.'); return; }
+  try {
+    await api('/api/cameras', { method:'POST', body:JSON.stringify(payload) });
+    toast('success','Câmera cadastrada.');
+    await carregarCameras();
+    selecionarCamera(payload.codigo);
+  } catch(e) { toast('error', e.message); }
+}
+
+async function salvarCamera() {
+  if (!_cameraAtual) return;
+  const payload = {
+    nome:        document.getElementById('c-nome')?.value.trim(),
+    localizacao: document.getElementById('c-local')?.value.trim(),
+    area_codigo: document.getElementById('c-area')?.value.trim()||null,
+    nivel_acesso:document.getElementById('c-nivel')?.value,
+    feed_url:    document.getElementById('c-feed')?.value.trim()||null,
+  };
+  try {
+    await api(`/api/cameras/${_cameraAtual}`, { method:'PUT', body:JSON.stringify(payload) });
+    toast('success','Câmera atualizada.');
+    await carregarCameras();
+  } catch(e) { toast('error', e.message); }
+}
+
+async function alterarStatus(codigo, status) {
+  try {
+    await api(`/api/cameras/${codigo}/status`, { method:'PUT', body:JSON.stringify({ status }) });
+    toast('success', `Status → ${status}`);
+    await carregarCameras();
+    selecionarCamera(codigo);
+  } catch(e) { toast('error', e.message); }
+}
+
+async function confirmarDelete(codigo) {
+  try {
+    await api(`/api/cameras/${codigo}`, { method:'DELETE' });
+    toast('success','Câmera excluída.');
+    _cameraAtual = null;
+    document.getElementById('edit-main').innerHTML = `
+      <div class="edit-empty"><div class="edit-empty-icon">◉</div><p>Câmera excluída.</p></div>`;
+    await carregarCameras();
+  } catch(e) { toast('error', e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', carregarCameras);
+</script>
+{% endblock %}

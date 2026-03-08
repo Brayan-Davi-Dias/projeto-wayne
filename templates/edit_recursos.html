@@ -1,0 +1,339 @@
+{% extends "base_corp.html" %}
+{% block title %}Recursos — Wayne Industries{% endblock %}
+{% block nav_recursos %}active{% endblock %}
+{% block page_title %}Gestão de Recursos{% endblock %}
+{% block page_breadcrumb %}Wayne Industries / Recursos{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edit.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="edit-page">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="edit-sidebar">
+    <div class="sidebar-search">
+      <span class="s-icon">⌕</span>
+      <input id="sb-search" placeholder="Buscar recurso..." oninput="filtrarSidebar()">
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:4px">
+      <select class="filter-select" id="sb-tipo" onchange="filtrarSidebar()" style="flex:1">
+        <option value="">Todos os tipos</option>
+        <option value="veiculo">Veículos</option>
+        <option value="equipamento">Equipamentos</option>
+        <option value="dispositivo">Dispositivos</option>
+      </select>
+      <select class="filter-select" id="sb-status" onchange="filtrarSidebar()" style="flex:1">
+        <option value="">Todos</option>
+        <option value="disponivel">Disponível</option>
+        <option value="operacional">Operacional</option>
+        <option value="standby">Standby</option>
+        <option value="manutencao">Manutenção</option>
+        <option value="critico">Crítico</option>
+      </select>
+    </div>
+    <div class="corp-panel" style="overflow:hidden">
+      <div class="panel-header" style="padding:10px 14px">
+        <span class="panel-title">RECURSOS</span>
+        <span class="panel-count" id="sb-count">0</span>
+      </div>
+      <div class="sidebar-list" id="sb-list">
+        <div class="sidebar-empty">Carregando...</div>
+      </div>
+      <div class="sidebar-footer">
+        <button class="btn btn-primary" style="width:100%" onclick="abrirNovo()">+ Novo Recurso</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="edit-main" id="edit-main">
+    <div class="edit-empty">
+      <div class="edit-empty-icon">◈</div>
+      <p>Selecione um recurso ou cadastre um novo</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _recursos = [];
+let _recursoAtual = null;
+
+const statusRec = {
+  disponivel:  { cor:'green',  label:'Disponível' },
+  operacional: { cor:'blue',   label:'Operacional' },
+  standby:     { cor:'muted',  label:'Standby' },
+  manutencao:  { cor:'gold',   label:'Manutenção' },
+  critico:     { cor:'red',    label:'Crítico' },
+};
+const tipoIcon = { veiculo:'🚗', equipamento:'🛡', dispositivo:'📡' };
+
+async function carregarRecursos() {
+  try {
+    _recursos = await api('/api/recursos');
+    renderSidebar(_recursos);
+  } catch(e) { toast('error','Erro ao carregar recursos: '+e.message); }
+}
+
+function renderSidebar(list) {
+  const el = document.getElementById('sb-list');
+  document.getElementById('sb-count').textContent = list.length;
+  if (!list.length) { el.innerHTML = '<div class="sidebar-empty">Nenhum recurso</div>'; return; }
+  el.innerHTML = list.map(r => {
+    const s = statusRec[r.status] || { cor:'muted', label:r.status };
+    return `
+      <div class="sidebar-item ${_recursoAtual===r.codigo?'active':''}" onclick="selecionarRecurso('${r.codigo}')">
+        <span style="font-size:14px">${tipoIcon[r.tipo]||'◈'}</span>
+        <div class="si-info">
+          <div class="si-name">${r.nome}</div>
+          <div class="si-sub">${r.codigo} · ${r.subtipo||r.tipo}</div>
+        </div>
+        <span class="si-badge" style="color:var(--${s.cor});background:var(--${s.cor})22;border:1px solid var(--${s.cor})44">
+          ${s.label.toUpperCase()}
+        </span>
+      </div>`;
+  }).join('');
+}
+
+function filtrarSidebar() {
+  const q = document.getElementById('sb-search').value.toLowerCase();
+  const t = document.getElementById('sb-tipo').value;
+  const s = document.getElementById('sb-status').value;
+  renderSidebar(_recursos.filter(r =>
+    (!q || r.nome.toLowerCase().includes(q) || r.codigo.toLowerCase().includes(q)) &&
+    (!t || r.tipo === t) && (!s || r.status === s)
+  ));
+}
+
+async function selecionarRecurso(codigo) {
+  _recursoAtual = codigo;
+  filtrarSidebar();
+  try {
+    const r = await api(`/api/recursos/${codigo}`);
+    renderFormulario(r);
+  } catch(e) { toast('error', e.message); }
+}
+
+function renderFormulario(r) {
+  const main = document.getElementById('edit-main');
+  const s = statusRec[r.status] || { cor:'muted', label: r.status };
+
+  main.innerHTML = `
+    <div class="edit-topbar">
+      <div class="edit-breadcrumb">Recursos / <span>${r.nome}</span></div>
+      <div class="edit-actions">
+        <button class="btn btn-ghost btn-sm" onclick="carregarRecursos()">↺ Atualizar</button>
+        <button class="btn btn-primary btn-sm" onclick="salvarRecurso()">✓ Salvar</button>
+      </div>
+    </div>
+
+    <!-- Header do recurso -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">${tipoIcon[r.tipo]||'◈'}</span>
+          <div>
+            <div style="font-size:14px;font-weight:800">${r.nome}</div>
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted)">${r.codigo} · ${r.tipo}</div>
+          </div>
+        </div>
+        <span class="badge badge-${s.cor}">${s.label}</span>
+      </div>
+      <div class="form-card-body">
+        <div class="fg c2">
+          <div class="fl">
+            <label>Código *</label>
+            <input id="r-codigo" value="${r.codigo||''}" disabled>
+            <span class="hint">Identificador único — não pode ser alterado</span>
+          </div>
+          <div class="fl">
+            <label>Nome *</label>
+            <input id="r-nome" value="${r.nome||''}">
+          </div>
+          <div class="fl">
+            <label>Tipo *</label>
+            <select id="r-tipo">
+              ${['veiculo','equipamento','dispositivo'].map(t =>
+                `<option value="${t}" ${r.tipo===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="fl">
+            <label>Subtipo</label>
+            <input id="r-subtipo" value="${r.subtipo||''}" placeholder="Ex: blindado, eletrônico">
+          </div>
+          <div class="fl">
+            <label>Status</label>
+            <select id="r-status">
+              ${Object.entries(statusRec).map(([k,v]) =>
+                `<option value="${k}" ${r.status===k?'selected':''}>${v.label}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="fl">
+            <label>Localização</label>
+            <input id="r-local" value="${r.localizacao||''}" placeholder="Ex: Hangar, Arsenal">
+          </div>
+          <div class="fl">
+            <label>Responsável</label>
+            <input id="r-resp" value="${r.responsavel||''}" placeholder="Nome do responsável">
+          </div>
+          <div class="fl span2">
+            <label>Descrição</label>
+            <textarea id="r-desc">${r.descricao||''}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Troca rápida de status -->
+    <div class="form-card">
+      <div class="form-card-header"><span class="form-card-title">Alterar Status Rápido</span></div>
+      <div class="form-card-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${Object.entries(statusRec).map(([k,v]) => `
+            <button class="btn btn-sm ${r.status===k?'btn-primary':'btn-ghost'}"
+              style="${r.status===k?'':'border-color:var(--'+v.cor+');color:var(--'+v.cor+')'}"
+              onclick="alterarStatusRecurso('${r.codigo}','${k}')">
+              ● ${v.label}
+            </button>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="danger-zone">
+      <div class="form-card-header"><span class="form-card-title">⚠ Zona de Perigo</span></div>
+      <div class="form-card-body">
+        <div class="danger-row">
+          <div class="danger-info">
+            <h4>Marcar como Crítico</h4>
+            <p>Define o status como crítico e gera um alerta no sistema.</p>
+          </div>
+          <button class="btn btn-sm" style="border-color:var(--red);color:var(--red)"
+            onclick="marcarCritico('${r.codigo}')">⚠ Crítico</button>
+        </div>
+        <div class="danger-row">
+          <div class="danger-info">
+            <h4>Excluir Recurso</h4>
+            <p>Remove permanentemente o registro do inventário.</p>
+          </div>
+          <div>
+            <div class="confirm-bar" id="confirm-del">
+              <p>Confirma exclusão de <strong>${r.nome}</strong>?</p>
+              <button class="btn btn-sm" style="border-color:var(--red);color:var(--red)" onclick="confirmarDelete('${r.codigo}')">Excluir</button>
+              <button class="btn btn-sm btn-ghost" onclick="document.getElementById('confirm-del').classList.remove('visible')">Cancelar</button>
+            </div>
+            <button class="btn btn-sm" style="border-color:var(--red);color:var(--red)"
+              onclick="document.getElementById('confirm-del').classList.add('visible')">✕ Excluir</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function abrirNovo() {
+  _recursoAtual = null;
+  document.getElementById('edit-main').innerHTML = `
+    <div class="edit-topbar">
+      <div class="edit-breadcrumb">Recursos / <span>Novo</span></div>
+      <div class="edit-actions">
+        <button class="btn btn-primary btn-sm" onclick="criarRecurso()">✓ Criar</button>
+      </div>
+    </div>
+    <div class="form-card">
+      <div class="form-card-header"><span class="form-card-title">Novo Recurso</span></div>
+      <div class="form-card-body">
+        <div class="fg c2">
+          <div class="fl"><label>Código *</label><input id="r-codigo" placeholder="REC-XX"></div>
+          <div class="fl"><label>Nome *</label><input id="r-nome" placeholder="Nome do recurso"></div>
+          <div class="fl"><label>Tipo *</label>
+            <select id="r-tipo">
+              <option value="veiculo">Veículo</option>
+              <option value="equipamento">Equipamento</option>
+              <option value="dispositivo">Dispositivo</option>
+            </select>
+          </div>
+          <div class="fl"><label>Subtipo</label><input id="r-subtipo" placeholder="Ex: blindado"></div>
+          <div class="fl"><label>Status</label>
+            <select id="r-status">
+              ${Object.entries(statusRec).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="fl"><label>Localização</label><input id="r-local" placeholder="Ex: Hangar"></div>
+          <div class="fl"><label>Responsável</label><input id="r-resp" placeholder="Nome"></div>
+          <div class="fl span2"><label>Descrição</label><textarea id="r-desc" placeholder="Opcional..."></textarea></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function criarRecurso() {
+  const payload = {
+    codigo:      document.getElementById('r-codigo')?.value.trim(),
+    nome:        document.getElementById('r-nome')?.value.trim(),
+    tipo:        document.getElementById('r-tipo')?.value,
+    subtipo:     document.getElementById('r-subtipo')?.value.trim()||null,
+    status:      document.getElementById('r-status')?.value,
+    localizacao: document.getElementById('r-local')?.value.trim()||null,
+    responsavel: document.getElementById('r-resp')?.value.trim()||null,
+    descricao:   document.getElementById('r-desc')?.value.trim()||null,
+  };
+  if (!payload.codigo||!payload.nome) { toast('warning','Código e nome são obrigatórios.'); return; }
+  try {
+    await api('/api/recursos', { method:'POST', body:JSON.stringify(payload) });
+    toast('success','Recurso cadastrado.');
+    await carregarRecursos();
+    selecionarRecurso(payload.codigo);
+  } catch(e) { toast('error', e.message); }
+}
+
+async function salvarRecurso() {
+  if (!_recursoAtual) return;
+  const payload = {
+    nome:        document.getElementById('r-nome')?.value.trim(),
+    tipo:        document.getElementById('r-tipo')?.value,
+    subtipo:     document.getElementById('r-subtipo')?.value.trim()||null,
+    status:      document.getElementById('r-status')?.value,
+    localizacao: document.getElementById('r-local')?.value.trim()||null,
+    responsavel: document.getElementById('r-resp')?.value.trim()||null,
+    descricao:   document.getElementById('r-desc')?.value.trim()||null,
+  };
+  try {
+    await api(`/api/recursos/${_recursoAtual}`, { method:'PUT', body:JSON.stringify(payload) });
+    toast('success','Recurso atualizado.');
+    await carregarRecursos();
+  } catch(e) { toast('error', e.message); }
+}
+
+async function alterarStatusRecurso(codigo, status) {
+  try {
+    await api(`/api/recursos/${codigo}`, { method:'PUT', body:JSON.stringify({ status }) });
+    toast('success', `Status → ${statusRec[status]?.label||status}`);
+    await carregarRecursos();
+    selecionarRecurso(codigo);
+  } catch(e) { toast('error', e.message); }
+}
+
+async function marcarCritico(codigo) {
+  await alterarStatusRecurso(codigo, 'critico');
+}
+
+async function confirmarDelete(codigo) {
+  try {
+    await api(`/api/recursos/${codigo}`, { method:'DELETE' });
+    toast('success','Recurso excluído.');
+    _recursoAtual = null;
+    document.getElementById('edit-main').innerHTML = `
+      <div class="edit-empty"><div class="edit-empty-icon">◈</div><p>Recurso excluído.</p></div>`;
+    await carregarRecursos();
+  } catch(e) { toast('error', e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', carregarRecursos);
+</script>
+{% endblock %}

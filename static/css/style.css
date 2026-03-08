@@ -1,0 +1,114 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Share+Tech+Mono&display=swap');
+
+/* ==========================================================================
+   1. BASE GLOBAL (Reset)
+   ========================================================================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #000;
+}
+
+
+/* ==========================================================================
+   2. TELA DE LOGIN (Wayne Enterprises)
+   ========================================================================== */
+body.state-login {
+  font-family: 'Inter', sans-serif;
+  background-color: #0d1117;
+  color: #c9d1d9;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#screen-login {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.corp-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.corp-grid {
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.corp-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(31, 111, 235, 0.15) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+}
+
+.corp-wrap {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  z-index: 2;
+}
+
+.corp-header { text-align: center; }
+.corp-logo-placeholder { width: 60px; height: 60px; background: linear-gradient(135deg, #1f6feb, #0d1117); border-radius: 8px; margin: 0 auto 15px; border: 1px solid #30363d; }
+.corp-logo-img { max-width: 80px; margin-bottom: 15px; }
+.cb-name { display: block; font-size: 1.5rem; font-weight: 700; color: #ffffff; text-transform: uppercase; letter-spacing: 2px; }
+.cb-tagline { font-size: 0.85rem; color: #8b949e; letter-spacing: 0.5px; }
+
+.corp-panel {
+  background: rgba(22, 27, 34, 0.8);
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 30px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.cp-title { font-size: 1.2rem; color: #ffffff; text-transform: uppercase; margin-bottom: 5px; }
+.cp-subtitle { font-size: 0.85rem; color: #8b949e; margin-bottom: 25px; }
+
+.cp-field { margin-bottom: 20px; display: flex; flex-direction: column; }
+.cp-field label { font-size: 0.8rem; text-transform: uppercase; color: #8b949e; margin-bottom: 8px; letter-spacing: 1px; }
+.cp-field input { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 12px 15px; border-radius: 6px; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+.cp-field input:focus { border-color: #1f6feb; }
+
+.cp-options { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; margin-bottom: 25px; }
+.cp-check { display: flex; align-items: center; gap: 8px; color: #8b949e; cursor: pointer; }
+.cp-link { color: #1f6feb; text-decoration: none; transition: color 0.2s; }
+.cp-link:hover { color: #58a6ff; }
+
+.cp-btn { width: 100%; background: #1f6feb; color: #ffffff; border: none; padding: 12px; border-radius: 6px; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: background 0.2s; }
+.cp-btn:hover { background: #388bfd; }
+.cp-btn:disabled { background: #30363d; cursor: not-allowed; }
+
+.cp-error { margin-top: 15px; padding: 10px; background: rgba(248, 81, 73, 0.1); border: 1px solid #f85149; color: #ff7b72; border-radius: 6px; font-size: 0.85rem; text-align: center; }
+
+.cp-footer { margin-top: 25px; font-size: 0.75rem; color: #8b949e; display: flex; justify-content: center; gap: 8px; }
+.corp-bottom { text-align: center; font-size: 0.75rem; color: #484f58; }

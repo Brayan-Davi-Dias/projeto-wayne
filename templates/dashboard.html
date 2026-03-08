@@ -1,0 +1,607 @@
+{% extends "base_corp.html" %}
+{% block title %}Dashboard — Wayne Industries{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+{% block page_title %}Painel de Controle{% endblock %}
+{% block page_breadcrumb %}Wayne Industries / Dashboard{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+{% endblock %}
+
+
+{% block content %}
+
+<!-- ══════════ TABS ══════════ -->
+<div class="dash-tabs">
+  <button class="dash-tab active" onclick="switchTab('overview',this)">
+    <span>⬡</span><span>Overview</span>
+  </button>
+  <button class="dash-tab" onclick="switchTab('cameras',this)">
+    <span>◉</span><span>Câmeras</span>
+    <span class="tab-badge info" id="badge-cameras">—</span>
+  </button>
+  <button class="dash-tab" onclick="switchTab('areas',this)">
+    <span>▦</span><span>Áreas</span>
+  </button>
+  <button class="dash-tab" onclick="switchTab('recursos',this)">
+    <span>◈</span><span>Recursos</span>
+  </button>
+  <button class="dash-tab" onclick="switchTab('alertas',this)">
+    <span>⚠</span><span>Alertas</span>
+    <span class="tab-badge alerta" id="badge-alertas">0</span>
+  </button>
+  <button class="dash-tab" id="tab-usuarios" style="display:none" onclick="switchTab('usuarios',this)">
+    <span>◎</span><span>Usuários</span>
+  </button>
+  <button class="dash-tab" id="tab-logs" style="display:none" onclick="switchTab('logs',this)">
+    <span>≡</span><span>Logs</span>
+  </button>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     ABA 1 — OVERVIEW
+     ══════════════════════════════════════════ -->
+<div class="dash-panel active" id="panel-overview">
+
+  <!-- Métricas top -->
+  <div class="ov-metrics">
+    <div class="ov-metric blue" onclick="switchTabByName('cameras')">
+      <div class="ov-m-label">Câmeras Online</div>
+      <div class="ov-m-value blue" id="ov-cam-online">—</div>
+      <div class="ov-m-sub">de <span id="ov-cam-total">—</span> câmeras</div>
+    </div>
+    <div class="ov-metric gold" onclick="switchTabByName('alertas')">
+      <div class="ov-m-label">Alertas Ativos</div>
+      <div class="ov-m-value gold" id="ov-alertas">—</div>
+      <div class="ov-m-sub">pendentes de resolução</div>
+    </div>
+    <div class="ov-metric red" onclick="switchTabByName('areas')">
+      <div class="ov-m-label">Acessos Negados</div>
+      <div class="ov-m-value red" id="ov-negados">—</div>
+      <div class="ov-m-sub">tentativas bloqueadas</div>
+    </div>
+    <div class="ov-metric green" onclick="switchTabByName('recursos')">
+      <div class="ov-m-label">Recursos Críticos</div>
+      <div class="ov-m-value green" id="ov-rec-criticos">—</div>
+      <div class="ov-m-sub">em manutenção / crítico</div>
+    </div>
+  </div>
+
+  <!-- Grid principal -->
+  <div class="ov-grid">
+
+    <!-- ESQUERDA -->
+    <div class="ov-left">
+      <div class="corp-panel">
+        <div class="panel-header" style="padding:10px 14px">
+          <span class="panel-title">RADAR</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;padding:10px">
+          <canvas id="radar-canvas" width="182" height="182"></canvas>
+        </div>
+      </div>
+
+      <div class="corp-panel" style="flex:1;overflow:hidden">
+        <div class="panel-header" style="padding:10px 14px">
+          <span class="panel-title">INVENTÁRIO</span>
+        </div>
+        <div class="ov-inv-body inv-list" id="inv-list">
+          <div class="empty-state" style="padding:20px"><span>Carregando...</span></div>
+        </div>
+      </div>
+
+      <div class="corp-panel">
+        <div class="panel-header" style="padding:10px 14px">
+          <span class="panel-title">FROTA</span>
+        </div>
+        <div class="ov-veh-body veh-stats" id="veh-stats">
+          <div class="empty-state" style="padding:12px"><span>Carregando...</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTRO -->
+    <div class="ov-center">
+      <div class="corp-panel" style="flex:1;overflow:hidden">
+        <div class="panel-header" style="padding:10px 14px">
+          <span class="panel-title">LOG DO SISTEMA</span>
+        </div>
+        <div class="ov-log-body log-body" id="log-body">
+          <div class="empty-state"><span>Carregando...</span></div>
+        </div>
+      </div>
+      <div class="corp-panel">
+        <div class="panel-header" style="padding:8px 14px">
+          <span class="panel-title" style="font-size:9px;letter-spacing:2px">ATIVIDADE — ÚLTIMAS 24H</span>
+        </div>
+        <div class="ov-chart-wrap">
+          <canvas id="main-chart" height="60" style="display:block;width:100%"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTRO INFERIOR -->
+    <div class="ov-center-bot corp-panel">
+      <div class="panel-header" style="padding:10px 14px">
+        <span class="panel-title">ACESSOS RECENTES</span>
+      </div>
+      <div class="ov-missions-body" id="missions-body">
+        <div class="empty-state"><span>Carregando...</span></div>
+      </div>
+    </div>
+
+    <!-- DIREITA -->
+    <div class="ov-right">
+      <div class="corp-panel" style="flex:1;overflow:hidden">
+        <div class="panel-header" style="padding:10px 14px">
+          <span class="panel-title">AMEAÇAS ATIVAS</span>
+        </div>
+        <div class="ov-threats-body threats-body" id="threats-body">
+          <div class="empty-state"><span>Carregando...</span></div>
+        </div>
+      </div>
+      <div class="corp-panel">
+        <div class="panel-header" style="padding:10px 14px">
+          <span class="panel-title">COMUNICAÇÕES</span>
+        </div>
+        <div class="ov-comms-body comms-body" id="comms-body">
+          <div class="empty-state"><span>Carregando...</span></div>
+        </div>
+      </div>
+      <div class="corp-panel">
+        <div class="panel-header" style="padding:10px 14px">
+          <span class="panel-title">MAPA — GOTHAM</span>
+        </div>
+        <canvas id="gotham-canvas" height="128" style="display:block;width:100%"></canvas>
+      </div>
+    </div>
+
+  </div><!-- /ov-grid -->
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     ABA 2 — CÂMERAS
+     ══════════════════════════════════════════ -->
+<div class="dash-panel" id="panel-cameras">
+
+  <div class="summary-cards">
+    <div class="s-card green"><div class="sc-label">Online</div><div class="sc-value green" id="c-online">—</div><div class="sc-sub">câmeras ativas</div></div>
+    <div class="s-card red"><div class="sc-label">Offline</div><div class="sc-value red" id="c-offline">—</div><div class="sc-sub">sem sinal</div></div>
+    <div class="s-card gold"><div class="sc-label">Manutenção</div><div class="sc-value gold" id="c-manut">—</div><div class="sc-sub">em serviço</div></div>
+    <div class="s-card blue"><div class="sc-label">Total</div><div class="sc-value blue" id="c-total">—</div><div class="sc-sub">cadastradas</div></div>
+  </div>
+
+  <div class="corp-panel">
+    <div class="panel-header">
+      <div class="panel-title-wrap">
+        <span class="panel-title">FEEDS DE CÂMERAS</span>
+        <span class="panel-count" id="cam-count">0</span>
+      </div>
+      <div class="panel-actions">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input class="search-input" id="cam-search" placeholder="Buscar câmera..." oninput="filtrarCameras()">
+        </div>
+        <select class="filter-select" id="cam-filter-status" onchange="filtrarCameras()">
+          <option value="">Todos os status</option>
+          <option value="online">Online</option>
+          <option value="offline">Offline</option>
+          <option value="manutencao">Manutenção</option>
+        </select>
+        <select class="filter-select" id="cam-filter-acesso" onchange="filtrarCameras()">
+          <option value="">Todos os níveis</option>
+          <option value="operador">Operador+</option>
+          <option value="funcionario">Funcionário+</option>
+          <option value="gerente">Gerente+</option>
+          <option value="admin">Admin</option>
+        </select>
+        <a href="/cameras/editar" class="btn btn-ghost btn-sm" id="btn-gerenciar-cameras" style="display:none">✎ Gerenciar</a>
+      </div>
+    </div>
+    <div style="padding:16px">
+      <div class="cameras-grid" id="cameras-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="empty-state-icon">◉</div><span>Carregando câmeras...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal câmera -->
+  <div class="modal-overlay" id="modal-camera" style="display:none">
+    <div class="modal-box wide" style="position:relative;max-width:640px">
+      <button class="modal-close" onclick="fecharModal('modal-camera')">✕</button>
+      <div id="modal-cam-content"></div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     ABA 3 — ÁREAS
+     ══════════════════════════════════════════ -->
+<div class="dash-panel" id="panel-areas">
+
+  <div class="summary-cards">
+    <div class="s-card blue"><div class="sc-label">Total de Áreas</div><div class="sc-value blue" id="a-total">—</div><div class="sc-sub">zonas cadastradas</div></div>
+    <div class="s-card green"><div class="sc-label">Com Acesso</div><div class="sc-value green" id="a-acesso">—</div><div class="sc-sub">liberadas para você</div></div>
+    <div class="s-card red"><div class="sc-label">Restritas</div><div class="sc-value red" id="a-restrict">—</div><div class="sc-sub">acesso negado</div></div>
+    <div class="s-card gold"><div class="sc-label">Em Alerta</div><div class="sc-value gold" id="a-alert">—</div><div class="sc-sub">crítico / alerta</div></div>
+  </div>
+
+  <div class="corp-panel">
+    <div class="panel-header">
+      <div class="panel-title-wrap">
+        <span class="panel-title">MAPA DE ÁREAS</span>
+        <span class="panel-count" id="area-count">0</span>
+      </div>
+      <div class="panel-actions">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input class="search-input" id="area-search" placeholder="Buscar área..." oninput="filtrarAreasTab()">
+        </div>
+        <select class="filter-select" id="area-filter-nivel" onchange="filtrarAreasTab()">
+          <option value="">Todos os níveis</option>
+          <option value="operador">Operador</option>
+          <option value="funcionario">Funcionário</option>
+          <option value="gerente">Gerente</option>
+          <option value="admin">Admin</option>
+        </select>
+        <select class="filter-select" id="area-filter-status" onchange="filtrarAreasTab()">
+          <option value="">Todos os status</option>
+          <option value="normal">Normal</option>
+          <option value="alerta">Alerta</option>
+          <option value="critico">Crítico</option>
+        </select>
+        <button class="btn btn-primary btn-sm" id="btn-nova-area" onclick="abrirFormArea()" style="display:none">+ Nova Área</button>
+        <a href="/areas/editar" class="btn btn-ghost btn-sm" id="btn-gerenciar-areas" style="display:none">✎ Gerenciar</a>
+      </div>
+    </div>
+    <div style="padding:16px">
+      <div class="areas-cards-grid" id="areas-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="empty-state-icon">▦</div><span>Carregando áreas...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log de áreas (gerente+) -->
+  <div class="corp-panel" id="panel-log-areas">
+    <div class="panel-header">
+      <span class="panel-title">REGISTRO DE ACESSOS FÍSICOS</span>
+      <div class="panel-actions">
+        <select class="filter-select" id="log-filter-area" onchange="carregarLogAreas()">
+          <option value="">Todas as áreas</option>
+        </select>
+      </div>
+    </div>
+    <div class="corp-table-wrap">
+      <table class="corp-table">
+        <thead><tr><th>Usuário</th><th>Área</th><th>Tipo</th><th>Motivo</th><th>Data / Hora</th></tr></thead>
+        <tbody id="log-tbody">
+          <tr><td colspan="5"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal área -->
+  <div class="modal-overlay" id="modal-area" style="display:none">
+    <div class="modal-box wide" style="position:relative">
+      <button class="modal-close" onclick="fecharModal('modal-area')">✕</button>
+      <div class="modal-title" id="modal-area-title">Nova Área</div>
+      <div style="margin-top:18px">
+        <div class="form-grid cols-2">
+          <div class="form-group"><label class="form-label">Código *</label><input class="form-input" id="area-f-codigo" placeholder="AREA-XX"></div>
+          <div class="form-group"><label class="form-label">Nome *</label><input class="form-input" id="area-f-nome" placeholder="Nome da área"></div>
+          <div class="form-group"><label class="form-label">Andar *</label><input class="form-input" id="area-f-andar" placeholder="Ex: 1º Andar"></div>
+          <div class="form-group"><label class="form-label">Nível de Acesso *</label>
+            <select class="form-select" id="area-f-nivel">
+              <option value="operador">Operador</option><option value="funcionario">Funcionário</option>
+              <option value="gerente">Gerente</option><option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Status</label>
+            <select class="form-select" id="area-f-status">
+              <option value="normal">Normal</option><option value="alerta">Alerta</option><option value="critico">Crítico</option>
+            </select>
+          </div>
+          <div class="form-group span-2"><label class="form-label">Descrição</label>
+            <textarea class="form-textarea" id="area-f-desc" placeholder="Descrição opcional..."></textarea>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+          <button class="btn btn-primary" onclick="salvarArea()">Salvar</button>
+          <button class="btn btn-ghost" onclick="fecharModal('modal-area')">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal acesso -->
+  <div class="modal-overlay" id="modal-acesso" style="display:none">
+    <div class="modal-box" style="position:relative">
+      <button class="modal-close" onclick="fecharModal('modal-acesso')">✕</button>
+      <div class="modal-icon">▦</div>
+      <div class="modal-title" id="acesso-titulo">Solicitar Acesso</div>
+      <div class="modal-body" id="acesso-corpo">—</div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="acesso-btn-confirmar">Confirmar Entrada</button>
+        <button class="btn btn-ghost" onclick="fecharModal('modal-acesso')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     ABA 4 — RECURSOS
+     ══════════════════════════════════════════ -->
+<div class="dash-panel" id="panel-recursos">
+
+  <div class="summary-cards">
+    <div class="s-card blue"><div class="sc-label">Veículos</div><div class="sc-value blue" id="cnt-veiculo">—</div><div class="sc-sub"><span id="cnt-veiculo-critico" style="color:var(--red)">0</span> críticos</div></div>
+    <div class="s-card gold"><div class="sc-label">Equipamentos</div><div class="sc-value gold" id="cnt-equipamento">—</div><div class="sc-sub"><span id="cnt-equipamento-critico" style="color:var(--red)">0</span> críticos</div></div>
+    <div class="s-card cyan"><div class="sc-label">Dispositivos</div><div class="sc-value cyan" id="cnt-dispositivo">—</div><div class="sc-sub"><span id="cnt-dispositivo-critico" style="color:var(--red)">0</span> críticos</div></div>
+    <div class="s-card green"><div class="sc-label">Total</div><div class="sc-value green" id="cnt-recursos-total">—</div><div class="sc-sub">recursos cadastrados</div></div>
+  </div>
+
+  <div class="corp-panel">
+    <div class="panel-header">
+      <div class="panel-title-wrap"><span class="panel-title">INVENTÁRIO DE RECURSOS</span></div>
+      <div class="panel-actions">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input class="search-input" id="busca-recurso" placeholder="Buscar recurso..." oninput="buscar()">
+        </div>
+        <select class="filter-select" id="filtro-tipo" onchange="filtrar()">
+          <option value="">Todos os tipos</option>
+          <option value="veiculo">Veículos</option>
+          <option value="equipamento">Equipamentos</option>
+          <option value="dispositivo">Dispositivos</option>
+        </select>
+        <select class="filter-select" id="filtro-status" onchange="filtrar()">
+          <option value="">Todos os status</option>
+          <option value="disponivel">Disponível</option>
+          <option value="operacional">Operacional</option>
+          <option value="standby">Standby</option>
+          <option value="manutencao">Manutenção</option>
+          <option value="critico">Crítico</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="abrirCriar()">+ Novo Recurso</button>
+        <a href="/recursos/editar" class="btn btn-ghost btn-sm" id="btn-gerenciar-recursos" style="display:none">✎ Gerenciar</a>
+      </div>
+    </div>
+    <div class="corp-table-wrap">
+      <table class="corp-table">
+        <thead><tr><th>Código</th><th>Nome</th><th>Tipo</th><th>Subtipo</th><th>Status</th><th>Localização</th><th>Responsável</th><th>Ações</th></tr></thead>
+        <tbody id="recursos-tabela">
+          <tr><td colspan="8"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal recurso -->
+  <div class="modal-overlay" id="modal-recurso" style="display:none">
+    <div class="modal-box wide" style="position:relative">
+      <button class="modal-close" onclick="fecharModal('modal-recurso')">✕</button>
+      <div class="modal-title" id="modal-titulo">Novo Recurso</div>
+      <form id="form-recurso" onsubmit="return false" style="margin-top:18px">
+        <div class="form-grid cols-2">
+          <div class="form-group"><label class="form-label">Código *</label><input class="form-input" id="campo-codigo" placeholder="REC-XX"></div>
+          <div class="form-group"><label class="form-label">Nome *</label><input class="form-input" id="campo-nome" placeholder="Nome do recurso"></div>
+          <div class="form-group"><label class="form-label">Tipo *</label>
+            <select class="form-select" id="campo-tipo">
+              <option value="veiculo">Veículo</option><option value="equipamento">Equipamento</option><option value="dispositivo">Dispositivo</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Subtipo</label><input class="form-input" id="campo-subtipo" placeholder="Ex: blindado, eletrônico"></div>
+          <div class="form-group"><label class="form-label">Status</label>
+            <select class="form-select" id="campo-status">
+              <option value="disponivel">Disponível</option><option value="operacional">Operacional</option>
+              <option value="standby">Standby</option><option value="manutencao">Manutenção</option><option value="critico">Crítico</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Localização</label><input class="form-input" id="campo-localizacao" placeholder="Ex: Hangar, Arsenal"></div>
+          <div class="form-group"><label class="form-label">Responsável</label><input class="form-input" id="campo-responsavel" placeholder="Nome do responsável"></div>
+          <div class="form-group span-2"><label class="form-label">Descrição</label><textarea class="form-textarea" id="campo-descricao" placeholder="Descrição opcional..."></textarea></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+          <button class="btn btn-primary" onclick="salvarRecurso()">Salvar</button>
+          <button class="btn btn-ghost" onclick="fecharModal('modal-recurso')">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     ABA 5 — ALERTAS
+     ══════════════════════════════════════════ -->
+<div class="dash-panel" id="panel-alertas">
+
+  <div class="corp-panel">
+    <div class="panel-header">
+      <div class="panel-title-wrap">
+        <span class="panel-title">CENTRAL DE ALERTAS</span>
+        <span class="panel-count" id="alerta-count">0</span>
+      </div>
+      <div class="panel-actions">
+        <select class="filter-select" id="filtro-nivel-alerta" onchange="renderizarAlertas()">
+          <option value="">Todos os níveis</option>
+          <option value="baixo">Baixo</option>
+          <option value="medio">Médio</option>
+          <option value="alto">Alto</option>
+          <option value="critico">Crítico</option>
+        </select>
+        <select class="filter-select" id="filtro-resolvido-alerta" onchange="renderizarAlertas()">
+          <option value="">Todos</option><option value="0">Ativos</option><option value="1">Resolvidos</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="abrirModal('modal-alerta')">+ Novo Alerta</button>
+      </div>
+    </div>
+    <div class="corp-table-wrap">
+      <table class="corp-table">
+        <thead><tr><th>Nível</th><th>Tipo</th><th>Título</th><th>Área</th><th>Criado Por</th><th>Data</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody id="alertas-tbody">
+          <tr><td colspan="8"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal alerta -->
+  <div class="modal-overlay" id="modal-alerta" style="display:none">
+    <div class="modal-box" style="position:relative">
+      <button class="modal-close" onclick="fecharModal('modal-alerta')">✕</button>
+      <div class="modal-title">Novo Alerta</div>
+      <div style="margin-top:18px">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Tipo *</label><input class="form-input" id="alerta-f-tipo" placeholder="Ex: Intrusão, Falha"></div>
+          <div class="form-group"><label class="form-label">Título *</label><input class="form-input" id="alerta-f-titulo" placeholder="Descrição breve"></div>
+          <div class="form-group"><label class="form-label">Nível</label>
+            <select class="form-select" id="alerta-f-nivel">
+              <option value="baixo">Baixo</option><option value="medio">Médio</option><option value="alto">Alto</option><option value="critico">Crítico</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Área (opcional)</label><input class="form-input" id="alerta-f-area" placeholder="Ex: AREA-04"></div>
+          <div class="form-group"><label class="form-label">Descrição</label><textarea class="form-textarea" id="alerta-f-desc" placeholder="Detalhes..."></textarea></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+          <button class="btn btn-primary" onclick="criarAlerta()">Registrar</button>
+          <button class="btn btn-ghost" onclick="fecharModal('modal-alerta')">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     ABA 6 — USUÁRIOS (admin)
+     ══════════════════════════════════════════ -->
+<div class="dash-panel" id="panel-usuarios">
+
+  <div class="summary-cards">
+    <div class="s-card blue"><div class="sc-label">Total</div><div class="sc-value blue" id="cnt-total-usuarios">—</div><div class="sc-sub">usuários</div></div>
+    <div class="s-card green"><div class="sc-label">Ativos</div><div class="sc-value green" id="cnt-ativos">—</div><div class="sc-sub">com acesso</div></div>
+    <div class="s-card red"><div class="sc-label">Admin</div><div class="sc-value red" id="cnt-admin">—</div><div class="sc-sub">nível administrador</div></div>
+    <div class="s-card gold"><div class="sc-label">Gerentes</div><div class="sc-value gold" id="cnt-gerente">—</div><div class="sc-sub">nível gerencial</div></div>
+  </div>
+
+  <div class="corp-panel">
+    <div class="panel-header">
+      <div class="panel-title-wrap"><span class="panel-title">GESTÃO DE USUÁRIOS</span></div>
+      <div class="panel-actions">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input class="search-input" id="busca-usuario" placeholder="Buscar usuário..." oninput="buscar()">
+        </div>
+        <select class="filter-select" id="filtro-nivel-usuario" onchange="filtrar()">
+          <option value="">Todos os níveis</option>
+          <option value="admin">Admin</option><option value="gerente">Gerente</option>
+          <option value="funcionario">Funcionário</option><option value="operador">Operador</option>
+        </select>
+        <select class="filter-select" id="filtro-dept" onchange="filtrar()">
+          <option value="">Todos os departamentos</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="abrirCriar()">+ Novo Usuário</button>
+        <a href="/usuarios/editar" class="btn btn-ghost btn-sm">✎ Gerenciar</a>
+      </div>
+    </div>
+    <div class="corp-table-wrap">
+      <table class="corp-table">
+        <thead><tr><th>ID</th><th>Nome</th><th>Nível</th><th>Departamento</th><th>Status</th><th>Criado Em</th><th>Ações</th></tr></thead>
+        <tbody id="usuarios-tabela">
+          <tr><td colspan="7"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal usuário -->
+  <div class="modal-overlay" id="modal-usuario" style="display:none">
+    <div class="modal-box wide" style="position:relative">
+      <button class="modal-close" onclick="fecharModal('modal-usuario')">✕</button>
+      <div class="modal-title" id="modal-titulo-usuario">Novo Usuário</div>
+      <form id="form-usuario" onsubmit="return false" style="margin-top:18px">
+        <div class="form-grid cols-2">
+          <div class="form-group"><label class="form-label">ID do Usuário *</label><input class="form-input" id="u-campo-id" placeholder="Ex: joao.silva"></div>
+          <div class="form-group"><label class="form-label">Nome Completo *</label><input class="form-input" id="u-campo-nome" placeholder="Nome"></div>
+          <div class="form-group"><label class="form-label">Nível *</label>
+            <select class="form-select" id="u-campo-nivel">
+              <option value="operador">Operador</option><option value="funcionario">Funcionário</option><option value="gerente">Gerente</option><option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Departamento *</label><input class="form-input" id="u-campo-dept" placeholder="Ex: Segurança, TI"></div>
+          <div class="form-group span-2"><label class="form-label" id="label-senha">Senha *</label><input class="form-input" id="u-campo-senha" type="password" placeholder="••••••••"></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+          <button class="btn btn-primary" onclick="salvarUsuario()">Salvar</button>
+          <button class="btn btn-ghost" onclick="fecharModal('modal-usuario')">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     ABA 7 — LOGS (gerente+)
+     ══════════════════════════════════════════ -->
+<div class="dash-panel" id="panel-logs">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <div class="corp-panel">
+      <div class="panel-header"><span class="panel-title">LOGS DE SISTEMA</span></div>
+      <div class="corp-table-wrap">
+        <table class="corp-table">
+          <thead><tr><th>Usuário</th><th>IP</th><th>Resultado</th><th>Mensagem</th><th>Data</th></tr></thead>
+          <tbody id="logs-sistema-tbody">
+            <tr><td colspan="5"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="corp-panel">
+      <div class="panel-header">
+        <span class="panel-title">LOGS DE ÁREAS</span>
+        <div class="panel-actions">
+          <select class="filter-select" id="log-filter-area-aba" onchange="carregarLogAreaAba()">
+            <option value="">Todas as áreas</option>
+          </select>
+        </div>
+      </div>
+      <div class="corp-table-wrap">
+        <table class="corp-table">
+          <thead><tr><th>Usuário</th><th>Área</th><th>Tipo</th><th>Motivo</th><th>Data</th></tr></thead>
+          <tbody id="logs-areas-tbody">
+            <tr><td colspan="5"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/recursos.js') }}"></script>
+<script src="{{ url_for('static', filename='js/usuarios.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard_controller.js') }}"></script>
+{% endblock %}

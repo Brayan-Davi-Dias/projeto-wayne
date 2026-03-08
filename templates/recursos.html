@@ -1,0 +1,300 @@
+{% extends "base_corp.html" %}
+{% block title %}Recursos — Wayne Industries{% endblock %}
+{% block nav_recursos %}active{% endblock %}
+{% block page_title %}Recursos{% endblock %}
+{% block page_breadcrumb %}Wayne Industries / Gestão de Recursos{% endblock %}
+
+{% block content %}
+
+<!-- CARDS DE RESUMO -->
+<div class="summary-cards">
+  <div class="s-card blue">
+    <div class="sc-label">Total</div>
+    <div class="sc-value blue" id="r-total">—</div>
+    <div class="sc-sub">recursos cadastrados</div>
+  </div>
+  <div class="s-card green">
+    <div class="sc-label">Disponíveis</div>
+    <div class="sc-value green" id="r-disp">—</div>
+    <div class="sc-sub">prontos para uso</div>
+  </div>
+  <div class="s-card gold">
+    <div class="sc-label">Manutenção</div>
+    <div class="sc-value gold" id="r-manut">—</div>
+    <div class="sc-sub">em serviço</div>
+  </div>
+  <div class="s-card red">
+    <div class="sc-label">Críticos</div>
+    <div class="sc-value red" id="r-crit">—</div>
+    <div class="sc-sub">atenção necessária</div>
+  </div>
+</div>
+
+<!-- PAINEL DE RECURSOS -->
+<div class="corp-panel">
+  <div class="panel-header">
+    <div class="panel-title-wrap">
+      <span class="panel-title">INVENTÁRIO DE RECURSOS</span>
+      <span class="panel-count" id="rec-count">0</span>
+    </div>
+    <div class="panel-actions">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input class="search-input" id="rec-search" placeholder="Buscar recurso..." oninput="filtrarRecursos()">
+      </div>
+      <select class="filter-select" id="rec-filter-tipo" onchange="filtrarRecursos()">
+        <option value="">Todos os tipos</option>
+        <option value="veiculo">Veículos</option>
+        <option value="equipamento">Equipamentos</option>
+        <option value="dispositivo">Dispositivos</option>
+      </select>
+      <select class="filter-select" id="rec-filter-status" onchange="filtrarRecursos()">
+        <option value="">Todos os status</option>
+        <option value="disponivel">Disponível</option>
+        <option value="manutencao">Manutenção</option>
+        <option value="critico">Crítico</option>
+        <option value="operacional">Operacional</option>
+        <option value="standby">Standby</option>
+      </select>
+      <button class="btn btn-primary btn-sm" id="btn-novo-rec" onclick="abrirFormRecurso()">+ Novo Recurso</button>
+    </div>
+  </div>
+
+  <div class="corp-table-wrap">
+    <table class="corp-table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Nome</th>
+          <th>Tipo</th>
+          <th>Subtipo</th>
+          <th>Status</th>
+          <th>Localização</th>
+          <th>Responsável</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="rec-tbody">
+        <tr><td colspan="8"><div class="empty-state"><span>Carregando...</span></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<!-- MODAL FORM -->
+<div class="modal-overlay" id="modal-recurso" style="display:none">
+  <div class="modal-box wide" style="position:relative">
+    <button class="modal-close" onclick="fecharModal('modal-recurso')">✕</button>
+    <div class="modal-title" id="modal-rec-title">Novo Recurso</div>
+    <div style="margin-top:18px">
+      <div class="form-grid cols-2">
+        <div class="form-group">
+          <label class="form-label">Código *</label>
+          <input class="form-input" id="rec-f-codigo" placeholder="REC-X00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nome *</label>
+          <input class="form-input" id="rec-f-nome" placeholder="Nome do recurso">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo *</label>
+          <select class="form-select" id="rec-f-tipo">
+            <option value="equipamento">Equipamento</option>
+            <option value="veiculo">Veículo</option>
+            <option value="dispositivo">Dispositivo</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subtipo</label>
+          <input class="form-input" id="rec-f-subtipo" placeholder="Ex: armamento, aeronave">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="rec-f-status">
+            <option value="disponivel">Disponível</option>
+            <option value="manutencao">Manutenção</option>
+            <option value="critico">Crítico</option>
+            <option value="operacional">Operacional</option>
+            <option value="standby">Standby</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Localização</label>
+          <input class="form-input" id="rec-f-loc" placeholder="Ex: Hangar, Arsenal">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Responsável</label>
+          <input class="form-input" id="rec-f-resp" placeholder="Nome do responsável">
+        </div>
+        <div class="form-group span-2">
+          <label class="form-label">Descrição</label>
+          <textarea class="form-textarea" id="rec-f-desc" placeholder="Descrição opcional..."></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+        <button class="btn btn-primary" id="rec-f-btn" onclick="salvarRecurso()">Salvar</button>
+        <button class="btn btn-ghost" onclick="fecharModal('modal-recurso')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let todosRecursos = [];
+let editandoCodigo = null;
+
+const STATUS_BADGE = {
+  disponivel:  'badge-green',
+  operacional: 'badge-cyan',
+  manutencao:  'badge-gold',
+  critico:     'badge-red',
+  standby:     'badge-muted',
+};
+const TIPO_BADGE = {
+  veiculo:     'badge-blue',
+  equipamento: 'badge-green',
+  dispositivo: 'badge-cyan',
+};
+
+async function carregarRecursos() {
+  try {
+    todosRecursos = await api('/api/recursos');
+    renderizarRecursos(todosRecursos);
+    atualizarCards(todosRecursos);
+  } catch(e) {
+    toast('error', 'Erro ao carregar recursos: ' + e.message);
+  }
+}
+
+function atualizarCards(recursos) {
+  document.getElementById('r-total').textContent = recursos.length;
+  document.getElementById('r-disp').textContent  = recursos.filter(r => r.status === 'disponivel' || r.status === 'operacional').length;
+  document.getElementById('r-manut').textContent = recursos.filter(r => r.status === 'manutencao').length;
+  document.getElementById('r-crit').textContent  = recursos.filter(r => r.status === 'critico').length;
+}
+
+function renderizarRecursos(recursos) {
+  const tbody = document.getElementById('rec-tbody');
+  document.getElementById('rec-count').textContent = recursos.length;
+
+  if (!recursos.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">
+      <div class="empty-state-icon">◈</div><span>Nenhum recurso encontrado</span></div></td></tr>`;
+    return;
+  }
+
+  const podeEditar = ['gerente','admin'].includes(window._sessao?.nivel);
+  const podeApagar = window._sessao?.nivel === 'admin';
+
+  tbody.innerHTML = recursos.map(r => `
+    <tr>
+      <td class="mono">${r.codigo}</td>
+      <td class="bold">${r.nome}</td>
+      <td><span class="badge ${TIPO_BADGE[r.tipo]||'badge-muted'}">${r.tipo}</span></td>
+      <td class="text-muted">${r.subtipo || '—'}</td>
+      <td><span class="badge ${STATUS_BADGE[r.status]||'badge-muted'}">${r.status}</span></td>
+      <td class="text-muted">${r.localizacao || '—'}</td>
+      <td class="text-muted">${r.responsavel || '—'}</td>
+      <td>
+        <div class="row-actions">
+          ${podeEditar ? `<button class="btn-icon" title="Editar" onclick="editarRecurso('${r.codigo}')">✎</button>` : ''}
+          ${podeApagar ? `<button class="btn-icon danger" title="Excluir" onclick="excluirRecurso('${r.codigo}','${r.nome}')">✕</button>` : ''}
+          ${!podeEditar ? '<span class="text-muted" style="font-size:10px">—</span>' : ''}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function filtrarRecursos() {
+  const q      = document.getElementById('rec-search').value.toLowerCase();
+  const tipo   = document.getElementById('rec-filter-tipo').value;
+  const status = document.getElementById('rec-filter-status').value;
+
+  const filtrados = todosRecursos.filter(r => {
+    const matchQ      = !q || r.nome.toLowerCase().includes(q) || r.codigo.toLowerCase().includes(q) || (r.responsavel||'').toLowerCase().includes(q);
+    const matchTipo   = !tipo   || r.tipo === tipo;
+    const matchStatus = !status || r.status === status;
+    return matchQ && matchTipo && matchStatus;
+  });
+  renderizarRecursos(filtrados);
+}
+
+function abrirFormRecurso(recurso = null) {
+  editandoCodigo = recurso ? recurso.codigo : null;
+  document.getElementById('modal-rec-title').textContent = recurso ? 'Editar Recurso' : 'Novo Recurso';
+  document.getElementById('rec-f-codigo').value  = recurso?.codigo  || '';
+  document.getElementById('rec-f-nome').value    = recurso?.nome    || '';
+  document.getElementById('rec-f-tipo').value    = recurso?.tipo    || 'equipamento';
+  document.getElementById('rec-f-subtipo').value = recurso?.subtipo || '';
+  document.getElementById('rec-f-status').value  = recurso?.status  || 'disponivel';
+  document.getElementById('rec-f-loc').value     = recurso?.localizacao || '';
+  document.getElementById('rec-f-resp').value    = recurso?.responsavel || '';
+  document.getElementById('rec-f-desc').value    = recurso?.descricao   || '';
+  document.getElementById('rec-f-codigo').disabled = !!recurso;
+  abrirModal('modal-recurso');
+}
+
+function editarRecurso(codigo) {
+  const rec = todosRecursos.find(r => r.codigo === codigo);
+  if (rec) abrirFormRecurso(rec);
+}
+
+async function salvarRecurso() {
+  const payload = {
+    codigo:      document.getElementById('rec-f-codigo').value.trim(),
+    nome:        document.getElementById('rec-f-nome').value.trim(),
+    tipo:        document.getElementById('rec-f-tipo').value,
+    subtipo:     document.getElementById('rec-f-subtipo').value.trim(),
+    status:      document.getElementById('rec-f-status').value,
+    localizacao: document.getElementById('rec-f-loc').value.trim(),
+    responsavel: document.getElementById('rec-f-resp').value.trim(),
+    descricao:   document.getElementById('rec-f-desc').value.trim(),
+  };
+
+  if (!payload.codigo || !payload.nome) {
+    toast('warning', 'Código e nome são obrigatórios.'); return;
+  }
+
+  try {
+    if (editandoCodigo) {
+      await api(`/api/recursos/${editandoCodigo}`, { method:'PUT', body: JSON.stringify(payload) });
+      toast('success', 'Recurso atualizado com sucesso.');
+    } else {
+      await api('/api/recursos', { method:'POST', body: JSON.stringify(payload) });
+      toast('success', 'Recurso criado com sucesso.');
+    }
+    fecharModal('modal-recurso');
+    carregarRecursos();
+  } catch(e) {
+    toast('error', e.message);
+  }
+}
+
+function excluirRecurso(codigo, nome) {
+  confirmar('Excluir Recurso', `Tem certeza que deseja excluir "${nome}"? Esta ação não pode ser desfeita.`, async () => {
+    try {
+      await api(`/api/recursos/${codigo}`, { method: 'DELETE' });
+      toast('success', 'Recurso excluído.');
+      carregarRecursos();
+    } catch(e) {
+      toast('error', e.message);
+    }
+  });
+}
+
+// Esconde botão de novo para operadores
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    if (!['gerente','admin'].includes(window._sessao?.nivel)) {
+      document.getElementById('btn-novo-rec').style.display = 'none';
+    }
+  }, 800);
+});
+
+carregarRecursos();
+</script>
+{% endblock %}

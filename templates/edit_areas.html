@@ -1,0 +1,328 @@
+{% extends "base_corp.html" %}
+{% block title %}Áreas — Wayne Industries{% endblock %}
+{% block nav_areas %}active{% endblock %}
+{% block page_title %}Gestão de Áreas{% endblock %}
+{% block page_breadcrumb %}Wayne Industries / Áreas{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/edit.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="edit-page">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="edit-sidebar">
+    <div class="sidebar-search">
+      <span class="s-icon">⌕</span>
+      <input id="sb-search" placeholder="Buscar área..." oninput="filtrarSidebar()">
+    </div>
+    <div class="corp-panel" style="overflow:hidden">
+      <div class="panel-header" style="padding:10px 14px">
+        <span class="panel-title">ÁREAS</span>
+        <span class="panel-count" id="sb-count">0</span>
+      </div>
+      <div class="sidebar-list" id="sb-list">
+        <div class="sidebar-empty">Carregando...</div>
+      </div>
+      <div class="sidebar-footer">
+        <button class="btn btn-primary" style="width:100%" onclick="abrirNovo()">+ Nova Área</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="edit-main" id="edit-main">
+    <div class="edit-empty">
+      <div class="edit-empty-icon">▦</div>
+      <p>Selecione uma área ou crie uma nova</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _areas = [];
+let _areaAtual = null;
+
+const statusCor = { normal:'green', alerta:'gold', critico:'red', bloqueado:'red' };
+const nivelCor  = { operador:'blue', funcionario:'green', gerente:'gold', admin:'red' };
+
+async function carregarAreas() {
+  try {
+    _areas = await api('/api/areas');
+    renderSidebar(_areas);
+  } catch(e) { toast('error','Erro ao carregar áreas: '+e.message); }
+}
+
+function renderSidebar(list) {
+  const el = document.getElementById('sb-list');
+  document.getElementById('sb-count').textContent = list.length;
+  if (!list.length) { el.innerHTML = '<div class="sidebar-empty">Nenhuma área</div>'; return; }
+  el.innerHTML = list.map(a => `
+    <div class="sidebar-item ${_areaAtual===a.codigo?'active':''}" onclick="selecionarArea('${a.codigo}')">
+      <div class="si-dot ${statusCor[a.status]||'muted'}"></div>
+      <div class="si-info">
+        <div class="si-name">${a.nome}</div>
+        <div class="si-sub">${a.codigo} · ${a.andar}</div>
+      </div>
+      <span class="si-badge" style="color:var(--${nivelCor[a.nivel_acesso]||'muted'});background:var(--${nivelCor[a.nivel_acesso]||'muted'})22;border:1px solid var(--${nivelCor[a.nivel_acesso]||'muted'})44">
+        ${a.nivel_acesso?.toUpperCase()||'—'}
+      </span>
+    </div>`).join('');
+}
+
+function filtrarSidebar() {
+  const q = document.getElementById('sb-search').value.toLowerCase();
+  renderSidebar(_areas.filter(a =>
+    a.nome.toLowerCase().includes(q) || a.codigo.toLowerCase().includes(q) || a.andar.toLowerCase().includes(q)
+  ));
+}
+
+async function selecionarArea(codigo) {
+  _areaAtual = codigo;
+  renderSidebar(_areas.filter(a => {
+    const q = document.getElementById('sb-search').value.toLowerCase();
+    return !q || a.nome.toLowerCase().includes(q) || a.codigo.toLowerCase().includes(q);
+  }));
+  try {
+    const a = await api(`/api/areas/${codigo}`);
+    renderFormulario(a);
+  } catch(e) { toast('error', e.message); }
+}
+
+function renderFormulario(a) {
+  const main = document.getElementById('edit-main');
+  main.innerHTML = `
+    <div class="edit-topbar">
+      <div class="edit-breadcrumb">Áreas / <span>${a.nome}</span></div>
+      <div class="edit-actions">
+        <button class="btn btn-ghost btn-sm" onclick="carregarAreas()">↺ Atualizar</button>
+        <button class="btn btn-primary btn-sm" onclick="salvarArea()">✓ Salvar</button>
+      </div>
+    </div>
+
+    <!-- Info principal -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <span class="form-card-title">Informações da Área</span>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--${statusCor[a.status]||'muted'})">${a.status?.toUpperCase()||'—'}</span>
+      </div>
+      <div class="form-card-body">
+        <div class="fg c2">
+          <div class="fl">
+            <label>Código *</label>
+            <input id="a-codigo" value="${a.codigo||''}" disabled>
+            <span class="hint">Identificador único — não pode ser alterado</span>
+          </div>
+          <div class="fl">
+            <label>Nome *</label>
+            <input id="a-nome" value="${a.nome||''}">
+          </div>
+          <div class="fl">
+            <label>Andar *</label>
+            <input id="a-andar" value="${a.andar||''}">
+          </div>
+          <div class="fl">
+            <label>Nível de Acesso *</label>
+            <select id="a-nivel">
+              ${['operador','funcionario','gerente','admin'].map(n =>
+                `<option value="${n}" ${a.nivel_acesso===n?'selected':''}>${n.charAt(0).toUpperCase()+n.slice(1)}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="fl">
+            <label>Status</label>
+            <select id="a-status">
+              ${['normal','alerta','critico','bloqueado'].map(s =>
+                `<option value="${s}" ${a.status===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="fl span2">
+            <label>Descrição</label>
+            <textarea id="a-desc">${a.descricao||''}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Câmeras vinculadas -->
+    <div class="form-card">
+      <div class="form-card-header"><span class="form-card-title">Câmeras Vinculadas</span></div>
+      <div class="form-card-body" id="a-cameras">
+        <div style="color:var(--muted);font-size:11px">Carregando câmeras...</div>
+      </div>
+    </div>
+
+    <!-- Log de acessos -->
+    <div class="form-card">
+      <div class="form-card-header"><span class="form-card-title">Últimos Acessos</span></div>
+      <div class="form-card-body">
+        <div class="activity-list" id="a-log">
+          <div style="text-align:center;color:var(--muted);font-size:11px;padding:20px">Carregando...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="danger-zone">
+      <div class="form-card-header"><span class="form-card-title">⚠ Zona de Perigo</span></div>
+      <div class="form-card-body">
+        <div class="danger-row">
+          <div class="danger-info">
+            <h4>Bloquear Área</h4>
+            <p>Define o status como "bloqueado", impedindo todos os acessos.</p>
+          </div>
+          <button class="btn btn-sm" style="border-color:var(--gold);color:var(--gold)"
+            onclick="bloquearArea('${a.codigo}')">⊘ Bloquear</button>
+        </div>
+        <div class="danger-row">
+          <div class="danger-info">
+            <h4>Excluir Área</h4>
+            <p>Remove permanentemente a área e seus registros.</p>
+          </div>
+          <div>
+            <div class="confirm-bar" id="confirm-del">
+              <p>Confirma exclusão de <strong>${a.nome}</strong>?</p>
+              <button class="btn btn-sm" style="border-color:var(--red);color:var(--red)" onclick="confirmarDelete('${a.codigo}')">Excluir</button>
+              <button class="btn btn-sm btn-ghost" onclick="document.getElementById('confirm-del').classList.remove('visible')">Cancelar</button>
+            </div>
+            <button class="btn btn-sm" style="border-color:var(--red);color:var(--red)"
+              onclick="document.getElementById('confirm-del').classList.add('visible')">✕ Excluir</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  carregarCamerasArea(a.codigo);
+  carregarLogArea(a.codigo);
+}
+
+async function carregarCamerasArea(codigo) {
+  try {
+    const cams = await api(`/api/cameras?area=${codigo}`);
+    const el = document.getElementById('a-cameras');
+    if (!el) return;
+    if (!cams.length) { el.innerHTML = '<div style="color:var(--muted);font-size:11px">Nenhuma câmera vinculada</div>'; return; }
+    const sc = {online:'badge-green',offline:'badge-red',manutencao:'badge-gold'};
+    el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">` +
+      cams.map(c => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius)">
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--blue2)">${c.codigo}</span>
+          <span style="font-size:11px;color:#b0bcd4">${c.nome}</span>
+          <span class="badge ${sc[c.status]||'badge-muted'}">${c.status}</span>
+        </div>`).join('') + '</div>';
+  } catch(e) {}
+}
+
+async function carregarLogArea(codigo) {
+  try {
+    const logs = await api(`/api/logs/areas?area=${codigo}&limit=8`);
+    const el = document.getElementById('a-log');
+    if (!el) return;
+    if (!logs.length) { el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:11px;padding:20px">Sem acessos registrados</div>'; return; }
+    const tc = {entrada:'var(--green)',saida:'var(--blue2)',negado:'var(--red)'};
+    el.innerHTML = logs.map(l => `
+      <div class="activity-item">
+        <div class="activity-dot" style="background:${tc[l.tipo]||'var(--muted)'}"></div>
+        <div class="activity-body">
+          <div class="activity-msg"><strong>${l.usuario_id||'—'}</strong> — ${l.tipo} ${l.motivo?'· '+l.motivo:''}</div>
+          <div class="activity-meta">${l.criado_em?.slice(0,16).replace('T',' ')||'—'}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+function abrirNovo() {
+  _areaAtual = null;
+  document.getElementById('edit-main').innerHTML = `
+    <div class="edit-topbar">
+      <div class="edit-breadcrumb">Áreas / <span>Nova</span></div>
+      <div class="edit-actions">
+        <button class="btn btn-primary btn-sm" onclick="criarArea()">✓ Criar</button>
+      </div>
+    </div>
+    <div class="form-card">
+      <div class="form-card-header"><span class="form-card-title">Nova Área</span></div>
+      <div class="form-card-body">
+        <div class="fg c2">
+          <div class="fl"><label>Código *</label><input id="a-codigo" placeholder="AREA-XX"></div>
+          <div class="fl"><label>Nome *</label><input id="a-nome" placeholder="Nome da área"></div>
+          <div class="fl"><label>Andar *</label><input id="a-andar" placeholder="Ex: 1º Andar"></div>
+          <div class="fl"><label>Nível de Acesso *</label>
+            <select id="a-nivel">
+              <option value="operador">Operador</option><option value="funcionario">Funcionário</option>
+              <option value="gerente">Gerente</option><option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="fl"><label>Status</label>
+            <select id="a-status">
+              <option value="normal">Normal</option><option value="alerta">Alerta</option><option value="critico">Crítico</option>
+            </select>
+          </div>
+          <div class="fl span2"><label>Descrição</label><textarea id="a-desc" placeholder="Descrição opcional..."></textarea></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function criarArea() {
+  const payload = {
+    codigo:       document.getElementById('a-codigo')?.value.trim(),
+    nome:         document.getElementById('a-nome')?.value.trim(),
+    andar:        document.getElementById('a-andar')?.value.trim(),
+    nivel_acesso: document.getElementById('a-nivel')?.value,
+    status:       document.getElementById('a-status')?.value,
+    descricao:    document.getElementById('a-desc')?.value.trim(),
+  };
+  if (!payload.codigo||!payload.nome||!payload.andar) { toast('warning','Código, nome e andar são obrigatórios.'); return; }
+  try {
+    await api('/api/areas', { method:'POST', body:JSON.stringify(payload) });
+    toast('success','Área criada.');
+    await carregarAreas();
+    selecionarArea(payload.codigo);
+  } catch(e) { toast('error', e.message); }
+}
+
+async function salvarArea() {
+  if (!_areaAtual) return;
+  const payload = {
+    nome:         document.getElementById('a-nome')?.value.trim(),
+    andar:        document.getElementById('a-andar')?.value.trim(),
+    nivel_acesso: document.getElementById('a-nivel')?.value,
+    status:       document.getElementById('a-status')?.value,
+    descricao:    document.getElementById('a-desc')?.value.trim(),
+  };
+  try {
+    await api(`/api/areas/${_areaAtual}`, { method:'PUT', body:JSON.stringify(payload) });
+    toast('success','Área atualizada.');
+    await carregarAreas();
+  } catch(e) { toast('error', e.message); }
+}
+
+async function bloquearArea(codigo) {
+  try {
+    await api(`/api/areas/${codigo}`, { method:'PUT', body:JSON.stringify({ status:'bloqueado' }) });
+    toast('success','Área bloqueada.');
+    await carregarAreas();
+    selecionarArea(codigo);
+  } catch(e) { toast('error', e.message); }
+}
+
+async function confirmarDelete(codigo) {
+  try {
+    await api(`/api/areas/${codigo}`, { method:'DELETE' });
+    toast('success','Área excluída.');
+    _areaAtual = null;
+    document.getElementById('edit-main').innerHTML = `
+      <div class="edit-empty"><div class="edit-empty-icon">▦</div><p>Área excluída.</p></div>`;
+    await carregarAreas();
+  } catch(e) { toast('error', e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', carregarAreas);
+</script>
+{% endblock %}

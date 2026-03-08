@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Wayne Industries{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/corp.css') }}" />
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-mark">W</div>
+      <div class="sb-logo-text">
+        <span class="sb-name">Wayne</span>
+        <span class="sb-sub">Industries</span>
+      </div>
+    </div>
+
+    <nav class="sb-nav">
+      <a href="/dashboard" class="sb-link {% block nav_dashboard %}{% endblock %}">
+        <span class="sb-icon">⬡</span><span>Dashboard</span>
+      </a>
+      <a href="/cameras" class="sb-link {% block nav_cameras %}{% endblock %}">
+        <span class="sb-icon">◉</span><span>Câmeras</span>
+      </a>
+      <a href="/recursos" class="sb-link {% block nav_recursos %}{% endblock %}">
+        <span class="sb-icon">◈</span><span>Recursos</span>
+      </a>
+      <a href="/areas" class="sb-link {% block nav_areas %}{% endblock %}">
+        <span class="sb-icon">▦</span><span>Áreas</span>
+      </a>
+      <a href="/usuarios" class="sb-link {% block nav_usuarios %}{% endblock %}" id="link-usuarios">
+        <span class="sb-icon">◎</span><span>Usuários</span>
+      </a>
+    </nav>
+
+    <div class="sb-footer">
+      <div class="sb-user" id="sb-user">
+        <div class="sb-avatar" id="sb-avatar">—</div>
+        <div class="sb-user-info">
+          <span class="sb-user-name" id="sb-user-name">Carregando...</span>
+          <span class="sb-user-level" id="sb-user-level">—</span>
+        </div>
+      </div>
+      <button class="sb-logout" onclick="fazerLogout()">⏻</button>
+    </div>
+  </aside>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <div class="corp-main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="tb-left">
+        <h1 class="tb-title">{% block page_title %}{% endblock %}</h1>
+        <span class="tb-breadcrumb">{% block page_breadcrumb %}{% endblock %}</span>
+      </div>
+      <div class="tb-right">
+        <div class="tb-clock" id="tb-clock">--:--:--</div>
+        <div class="tb-badge" id="tb-nivel-badge">—</div>
+      </div>
+    </header>
+
+    <!-- CONTEÚDO DA PÁGINA -->
+    <main class="page-body">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container"></div>
+
+  <!-- MODAL DE CONFIRMAÇÃO -->
+  <div class="modal-overlay" id="modal-confirm" style="display:none">
+    <div class="modal-box">
+      <div class="modal-icon">⚠</div>
+      <div class="modal-title" id="modal-confirm-title">Confirmar ação</div>
+      <div class="modal-body" id="modal-confirm-body">Tem certeza que deseja continuar?</div>
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="modal-confirm-ok">Confirmar</button>
+        <button class="btn btn-ghost" onclick="fecharModal('modal-confirm')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ── UTILITÁRIOS GLOBAIS ────────────────────────────────────────────────────
+
+  // Relógio
+  function tickClock() {
+    const p = n => String(n).padStart(2,'0');
+    const n = new Date();
+    const el = document.getElementById('tb-clock');
+    if (el) el.textContent = `${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+  }
+  setInterval(tickClock, 1000); tickClock();
+
+  // Sessão
+  async function carregarSessao() {
+    try {
+      const res  = await fetch('/api/sessao');
+      if (!res.ok) { window.location.href = '/'; return; }
+      const data = await res.json();
+
+      document.getElementById('sb-user-name').textContent  = data.nome || '—';
+      document.getElementById('sb-user-level').textContent = data.nivel?.toUpperCase() || '—';
+      document.getElementById('sb-avatar').textContent     = (data.nome || 'U')[0].toUpperCase();
+
+      const badge = document.getElementById('tb-nivel-badge');
+      badge.textContent = data.nivel?.toUpperCase();
+      badge.className   = `tb-badge nivel-${data.nivel}`;
+
+      // Esconde link de usuários para não-admins
+      if (data.nivel !== 'admin') {
+        const lu = document.getElementById('link-usuarios');
+        if (lu) lu.style.display = 'none';
+      }
+
+      window._sessao = data;
+    } catch (e) {
+      window.location.href = '/';
+    }
+  }
+  carregarSessao();
+
+  // Logout
+  async function fazerLogout() {
+    await fetch('/api/logout', { method: 'POST' });
+    window.location.href = '/';
+  }
+
+  // Toast
+  function toast(tipo, msg) {
+    const ct   = document.getElementById('toast-container');
+    const el   = document.createElement('div');
+    el.className = `toast toast-${tipo}`;
+    const icons = { success:'✓', error:'✕', warning:'⚠', info:'ℹ' };
+    el.innerHTML = `<span class="toast-icon">${icons[tipo]||'·'}</span><span>${msg}</span>`;
+    ct.appendChild(el);
+    setTimeout(() => { el.classList.add('hide'); setTimeout(() => el.remove(), 300); }, 3500);
+  }
+
+  // Modal de confirmação
+  function confirmar(titulo, corpo, callback) {
+    document.getElementById('modal-confirm-title').textContent = titulo;
+    document.getElementById('modal-confirm-body').textContent  = corpo;
+    document.getElementById('modal-confirm').style.display     = 'flex';
+    const btn = document.getElementById('modal-confirm-ok');
+    btn.onclick = () => { fecharModal('modal-confirm'); callback(); };
+  }
+
+  function abrirModal(id)  { document.getElementById(id).style.display = 'flex'; }
+  function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
+
+  // Fecha modal clicando fora
+  document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) fecharModal(m.id); });
+  });
+
+  // API helper
+  async function api(url, opts = {}) {
+    const defaults = { headers: { 'Content-Type': 'application/json' } };
+    const res = await fetch(url, { ...defaults, ...opts });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.erro || data.mensagem || 'Erro desconhecido');
+    return data;
+  }
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

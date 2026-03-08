@@ -1,0 +1,245 @@
+{% extends "base_corp.html" %}
+{% block title %}Câmeras — Wayne Industries{% endblock %}
+{% block nav_cameras %}active{% endblock %}
+{% block page_title %}Monitoramento{% endblock %}
+{% block page_breadcrumb %}Wayne Industries / Câmeras{% endblock %}
+
+{% block content %}
+
+<!-- CARDS DE RESUMO -->
+<div class="summary-cards" id="cam-cards">
+  <div class="s-card green">
+    <div class="sc-label">Online</div>
+    <div class="sc-value green" id="c-online">—</div>
+    <div class="sc-sub">câmeras ativas</div>
+  </div>
+  <div class="s-card red">
+    <div class="sc-label">Offline</div>
+    <div class="sc-value red" id="c-offline">—</div>
+    <div class="sc-sub">sem sinal</div>
+  </div>
+  <div class="s-card gold">
+    <div class="sc-label">Manutenção</div>
+    <div class="sc-value gold" id="c-manut">—</div>
+    <div class="sc-sub">em serviço</div>
+  </div>
+  <div class="s-card blue">
+    <div class="sc-label">Total</div>
+    <div class="sc-value blue" id="c-total">—</div>
+    <div class="sc-sub">câmeras cadastradas</div>
+  </div>
+</div>
+
+<!-- PAINEL DE CÂMERAS -->
+<div class="corp-panel">
+  <div class="panel-header">
+    <div class="panel-title-wrap">
+      <span class="panel-title">FEEDS DE CÂMERAS</span>
+      <span class="panel-count" id="cam-count">0</span>
+    </div>
+    <div class="panel-actions">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input class="search-input" id="cam-search" placeholder="Buscar câmera..." oninput="filtrarCameras()">
+      </div>
+      <select class="filter-select" id="cam-filter-status" onchange="filtrarCameras()">
+        <option value="">Todos os status</option>
+        <option value="online">Online</option>
+        <option value="offline">Offline</option>
+        <option value="manutencao">Manutenção</option>
+      </select>
+      <select class="filter-select" id="cam-filter-acesso" onchange="filtrarCameras()">
+        <option value="">Todos os níveis</option>
+        <option value="operador">Operador+</option>
+        <option value="funcionario">Funcionário+</option>
+        <option value="gerente">Gerente+</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+  </div>
+
+  <div style="padding: 16px;">
+    <div class="cameras-grid" id="cameras-grid">
+      <div class="empty-state">
+        <div class="empty-state-icon">◉</div>
+        <span>Carregando câmeras...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+<!-- MODAL DE CÂMERA AMPLIADA -->
+{% block scripts %}
+<div class="modal-overlay" id="modal-camera" style="display:none">
+  <div class="modal-box wide" style="position:relative; max-width:640px">
+    <button class="modal-close" onclick="fecharModal('modal-camera')">✕</button>
+    <div id="modal-cam-content"></div>
+  </div>
+</div>
+
+<script>
+let todasCameras = [];
+
+async function carregarCameras() {
+  try {
+    todasCameras = await api('/api/cameras');
+    renderizarCameras(todasCameras);
+    atualizarCards(todasCameras);
+  } catch (e) {
+    toast('error', 'Erro ao carregar câmeras: ' + e.message);
+  }
+}
+
+function atualizarCards(cameras) {
+  document.getElementById('c-online').textContent  = cameras.filter(c => c.status === 'online').length;
+  document.getElementById('c-offline').textContent = cameras.filter(c => c.status === 'offline').length;
+  document.getElementById('c-manut').textContent   = cameras.filter(c => c.status === 'manutencao').length;
+  document.getElementById('c-total').textContent   = cameras.length;
+}
+
+function renderizarCameras(cameras) {
+  const grid = document.getElementById('cameras-grid');
+  document.getElementById('cam-count').textContent = cameras.length;
+
+  if (!cameras.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-state-icon">◉</div><span>Nenhuma câmera encontrada</span></div>`;
+    return;
+  }
+
+  grid.innerHTML = cameras.map(c => {
+    const statusBadge = {
+      online:     '<span class="badge badge-green">Online</span>',
+      offline:    '<span class="badge badge-red">Offline</span>',
+      manutencao: '<span class="badge badge-gold">Manutenção</span>',
+    }[c.status] || '<span class="badge badge-muted">—</span>';
+
+    const nivelCor = {
+      operador: 'badge-muted', funcionario: 'badge-green',
+      gerente: 'badge-blue',  admin: 'badge-purple',
+    }[c.nivel_acesso] || 'badge-muted';
+
+    if (!c.tem_acesso) {
+      return `<div class="cam-card offline">
+        <div class="cam-thumb-wrap">
+          <div class="locked-overlay">
+            <div class="locked-icon">🔒</div>
+            <span>Acesso Restrito</span>
+            <span class="badge ${nivelCor}" style="margin-top:4px">${c.nivel_acesso}</span>
+          </div>
+        </div>
+        <div class="cam-info">
+          <div class="cam-name">${c.nome}</div>
+          <div class="cam-loc">${c.localizacao}</div>
+        </div>
+        <div class="cam-footer">
+          <span class="cam-code">${c.codigo}</span>
+          <span class="cam-locked">🔒 Sem acesso</span>
+        </div>
+      </div>`;
+    }
+
+    return `<div class="cam-card ${c.status === 'offline' ? 'offline' : ''}"
+                 onclick="abrirCamera('${c.codigo}')">
+      <div class="cam-thumb-wrap">
+        <img class="cam-thumb" src="${c.feed_url}" alt="${c.nome}"
+             onerror="this.src=''; this.style.background='#111827';">
+        <div class="cam-overlay"></div>
+        <div class="cam-status-dot ${c.status}"></div>
+        ${c.status === 'online' ? '<div class="cam-rec">● REC</div>' : ''}
+      </div>
+      <div class="cam-info">
+        <div class="cam-name">${c.nome}</div>
+        <div class="cam-loc">${c.localizacao}</div>
+      </div>
+      <div class="cam-footer">
+        <span class="cam-code">${c.codigo}</span>
+        ${statusBadge}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filtrarCameras() {
+  const q      = document.getElementById('cam-search').value.toLowerCase();
+  const status = document.getElementById('cam-filter-status').value;
+  const acesso = document.getElementById('cam-filter-acesso').value;
+
+  const filtradas = todasCameras.filter(c => {
+    const matchQ      = !q || c.nome.toLowerCase().includes(q) || c.localizacao.toLowerCase().includes(q) || c.codigo.toLowerCase().includes(q);
+    const matchStatus = !status || c.status === status;
+    const matchAcesso = !acesso || c.nivel_acesso === acesso;
+    return matchQ && matchStatus && matchAcesso;
+  });
+  renderizarCameras(filtradas);
+}
+
+async function abrirCamera(codigo) {
+  try {
+    const c = await api(`/api/cameras/${codigo}`);
+    const statusLabel = { online:'Online', offline:'Offline', manutencao:'Manutenção' }[c.status] || c.status;
+    const statusBadge = { online:'badge-green', offline:'badge-red', manutencao:'badge-gold' }[c.status];
+
+    document.getElementById('modal-cam-content').innerHTML = `
+      <div style="margin-bottom:12px">
+        <img class="cam-modal-img" src="${c.feed_url}" alt="${c.nome}"
+             onerror="this.style.display='none'">
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:15px;font-weight:800;margin-bottom:4px">${c.nome}</div>
+        <div style="font-size:11px;color:var(--muted);font-family:var(--font-mono)">${c.codigo} · ${c.localizacao}</div>
+      </div>
+      <div class="cam-modal-meta">
+        <div class="cmm-item">
+          <span class="cmm-label">Status</span>
+          <span><span class="badge ${statusBadge}">${statusLabel}</span></span>
+        </div>
+        <div class="cmm-item">
+          <span class="cmm-label">Área</span>
+          <span class="cmm-value">${c.area_codigo || '—'}</span>
+        </div>
+        <div class="cmm-item">
+          <span class="cmm-label">Nível de acesso</span>
+          <span class="cmm-value">${c.nivel_acesso}</span>
+        </div>
+        <div class="cmm-item">
+          <span class="cmm-label">Cadastrada em</span>
+          <span class="cmm-value">${c.criado_em?.slice(0,10) || '—'}</span>
+        </div>
+      </div>
+      ${window._sessao?.nivel === 'gerente' || window._sessao?.nivel === 'admin' ? `
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <div class="section-title">Alterar Status</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-ghost" onclick="alterarStatusCam('${c.codigo}','online')">● Online</button>
+          <button class="btn btn-sm btn-ghost" onclick="alterarStatusCam('${c.codigo}','offline')">● Offline</button>
+          <button class="btn btn-sm btn-ghost" onclick="alterarStatusCam('${c.codigo}','manutencao')">● Manutenção</button>
+        </div>
+      </div>` : ''}
+    `;
+    abrirModal('modal-camera');
+  } catch(e) {
+    toast('error', e.message);
+  }
+}
+
+async function alterarStatusCam(codigo, status) {
+  try {
+    await api(`/api/cameras/${codigo}/status`, {
+      method: 'PUT', body: JSON.stringify({ status })
+    });
+    toast('success', `Câmera ${codigo} — status alterado para ${status}`);
+    fecharModal('modal-camera');
+    carregarCameras();
+  } catch(e) {
+    toast('error', e.message);
+  }
+}
+
+carregarCameras();
+// Atualiza feeds a cada 30s
+setInterval(carregarCameras, 30000);
+</script>
+{% endblock %}
